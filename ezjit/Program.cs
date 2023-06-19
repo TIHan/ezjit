@@ -282,6 +282,7 @@ namespace EzJit
             TextWriter SymbolLookupMessages = new StringWriter();
             var symbolPath = new SymbolPath(SymbolPath.SymbolPathFromEnvironment).Add(SymbolPath.MicrosoftSymbolServerPath).Add(pdbDir);
             SymbolReader symbolReader = new SymbolReader(SymbolLookupMessages, symbolPath.ToString());
+            symbolReader.Options = SymbolReaderOptions.CacheOnly;
 
             // By default the symbol reader will NOT read PDBs from 'unsafe' locations (like next to the EXE)  
             // because hackers might make malicious PDBs.   If you wish ignore this threat, you can override this
