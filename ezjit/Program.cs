@@ -24,6 +24,14 @@ using System.ComponentModel;
 
 namespace EzJit
 {
+    static class TraceEventExtensions
+    {
+        public static string FullEventName(this TraceEvent traceEvent)
+        {
+            return $"{traceEvent.ProviderName}/{traceEvent.EventName}";
+        }
+    }
+
     static class Program
     {
         sealed class JitMethodData
@@ -58,8 +66,10 @@ namespace EzJit
         sealed class TimeStampRange
         {
             public double Start { get; set; }
+            public string StartEventName { get; set; }
 
             public double End { get; set; }
+            public string EndEventName { get; set; }
         }
 
         static string EzJitExeDirectory
@@ -303,6 +313,16 @@ namespace EzJit
             var managedCalls = new List<MethodCallData>();
             var nativeCalls = new List<MethodCallData>();
 
+            // Pre-process to get time-stamps for the first occurence of the start and/or end events.
+            if (timeStampRange != null && !string.IsNullOrWhiteSpace(timeStampRange.StartEventName) || !string.IsNullOrWhiteSpace(timeStampRange.EndEventName))
+            {
+                using (var source = new ETWTraceEventSource(etlFilePath))
+                {
+                    source.Dynamic.All += AllEvents;
+                    source.Process();
+                }
+            }
+
             using (var source = new ETWTraceEventSource(etlFilePath))
             {
                 source.Clr.MethodJittingStarted += Clr_MethodJittingStarted;
@@ -383,6 +403,19 @@ namespace EzJit
             }
 
             return (methods.Where(x => x.EndTime != 0).ToList(), managedCalls, nativeCalls);
+
+            void AllEvents(TraceEvent obj)
+            {
+                if (!string.IsNullOrWhiteSpace(timeStampRange.StartEventName) && timeStampRange.Start == 0 && obj.FullEventName() == timeStampRange.StartEventName)
+                {
+                    timeStampRange.Start = obj.TimeStampRelativeMSec;
+                }
+
+                if (!string.IsNullOrWhiteSpace(timeStampRange.EndEventName) && timeStampRange.End == double.MaxValue && obj.FullEventName() == timeStampRange.EndEventName)
+                {
+                    timeStampRange.End = obj.TimeStampRelativeMSec;
+                }
+            }
 
             void Clr_MethodJittingStarted(MethodJittingStartedTraceData data)
             {
@@ -475,6 +508,10 @@ namespace EzJit
                 [CommandOption("--analyze")]
                 [Description("Analyze ETL.")]
                 public bool CanAnalyze { get; set; }
+
+                [CommandOption("--providers")]
+                [Description("ETW providers. Comma-delimited")]
+                public string Providers { get; set; }
             }
 
             public override int Execute(CommandContext context, Settings settings)
@@ -496,7 +533,10 @@ namespace EzJit
                 args.Add("/CircularMB:4096");
                 args.Add("/CpuSampleMSec:0.125");
                 args.Add("/Process:\"corerun\"");
-            //    args.Add("/Providers:\"ClrPrivate\"");
+                if (!string.IsNullOrWhiteSpace(settings.Providers))
+                {
+                    args.Add($"/Providers:\"{settings.Providers}\"");
+                }
                 args.Add("/ClrEvents:GC,Binder,Security,AppDomainResourceManagement,Contention,Exception,Threading,JITSymbols,Type,GCHeapSurvivalAndMovement,GCHeapAndTypeNames,Stack,ThreadTransfer,Codesymbols,Compilation");
                 args.Add("/NoGui");
                 args.Add("/NoNGenRundown");
@@ -609,19 +649,42 @@ namespace EzJit
                 [CommandArgument(1, "<process-id>")]
                 public int ProcessId { get; set; }
 
-                [CommandOption("--start")]
+                [CommandOption("-s|--start")]
                 [Description("Filter events by time-stamps greater-than or equal to this value.")]
                 [DefaultValue((double)0)]
                 public double Start { get; set; }
 
-                [CommandOption("--end")]
+                [CommandOption("--start-event")]
+                [Description("Filter events by time-stamps greater-than or equal to the time-stamp of first occurence of the given event.")]
+                public string StartEventName { get; set; }
+
+                [CommandOption("-e|--end")]
                 [Description("Filter events by time-stamps less-than or equal to this value.")]
                 [DefaultValue(Double.MaxValue)]
                 public double End { get; set; }
 
+                [CommandOption("--end-event")]
+                [Description("Filter events by time-stamps less-than or equal to the time-stamp of first occurence of the given event.")]
+                public string EndEventName { get; set; }
+
                 [CommandOption("--hide-meth-sig")]
                 [Description("Hide method signatures.")]
                 public bool CanHideMethodSignature { get; set; }
+            }
+
+            public override ValidationResult Validate(CommandContext context, Settings settings)
+            {
+                if (settings.Start != 0 && !string.IsNullOrWhiteSpace(settings.StartEventName))
+                {
+                    return ValidationResult.Error("'--start' and '--start-event' cannot used at the same time.");
+                }
+
+                if (settings.End != double.MaxValue && !string.IsNullOrWhiteSpace(settings.EndEventName))
+                {
+                    return ValidationResult.Error("'--end' and '--end-event' cannot used at the same time.");
+                }
+
+                return base.Validate(context, settings);
             }
 
             public override int Execute(CommandContext context, Settings settings)
@@ -629,6 +692,8 @@ namespace EzJit
                 var range = new TimeStampRange();
                 range.Start = settings.Start;
                 range.End = settings.End;
+                range.StartEventName = settings.StartEventName;
+                range.EndEventName = settings.EndEventName;
                 var (jitMethods, managedCalls, nativeCalls) = ProcessEtl(settings.EtlFilePath, settings.CanHideMethodSignature, false, settings.ProcessId, range, string.Empty);
                 AnsiConsole.WriteLine("");
                 PrintTop20SlowestJittedMethods(jitMethods);
@@ -795,8 +860,8 @@ namespace EzJit
             app.Configure(config =>
             {
                 config.AddCommand<RunCommand>("run");
-                config.AddCommand<TraceCommand>("trace");
-                config.AddCommand<AnalyzeEtlCommand>("analyze-etl");
+                config.AddCommand<TraceCommand>("trace").WithExample(new string[] { "trace --providers \"ClrPrivate,PaintDotNetTrace\" \"paintdotnet.etl\" x64 release \"C:\\Program Files\\paint.net\\paintdotnet.dll\" /returnOnShownTime" });
+                config.AddCommand<AnalyzeEtlCommand>("analyze-etl").WithExample(new string[] { "analyze-etl \"paintdotnet.etl.zip\" 17180 --start-event \"PaintDotNetTrace/AppStarted\" --end-event \"PaintDotNetTrace/AppReady\"" });
             });
 
             try
