@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "ezjit": {
+      "commandName": "Project",
+      "commandLineArgs": "analyze-etl \"C:\\work\\CompilerBenchmarks.StageBenchmarks.CompileMethodsAndEmit_arm64.etl\" 15568"
+    }
+  }
+}
