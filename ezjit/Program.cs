@@ -20,6 +20,7 @@ using Microsoft.Diagnostics.Tracing.Etlx;
 using Microsoft.Diagnostics.Tracing.Parsers.Clr;
 using Microsoft.Diagnostics.Tracing.Stacks;
 using System.Reflection;
+using System.ComponentModel;
 
 namespace EzJit
 {
@@ -53,6 +54,13 @@ namespace EzJit
         }
 
         sealed record EzJitConfiguration(string RuntimeRepoPath, string FuzzlynRepoPath, string PerfViewExePath);
+
+        sealed class TimeStampRange
+        {
+            public double Start { get; set; }
+
+            public double End { get; set; }
+        }
 
         static string EzJitExeDirectory
         {
@@ -251,7 +259,7 @@ namespace EzJit
             return (corerunExe, dotNetExeOrDll, args, envVars);
         }
 
-        static (List<JitMethodData>, List<MethodCallData> managedCalls, List<MethodCallData> nativeCalls) ProcessEtl(string etlOrEtlZipFilePath, bool canHideSignature, bool isCoreRun, int processId, string pdbDir)
+        static (List<JitMethodData>, List<MethodCallData> managedCalls, List<MethodCallData> nativeCalls) ProcessEtl(string etlOrEtlZipFilePath, bool canHideMethodSignature, bool isCoreRun, int processId, TimeStampRange timeStampRange, string pdbDir)
         {
             if (Path.GetExtension(etlOrEtlZipFilePath).Equals(".zip", StringComparison.OrdinalIgnoreCase))
             {
@@ -261,7 +269,7 @@ namespace EzJit
 
                 try
                 {
-                    return ProcessEtlCore(nonZipEtlPath, canHideSignature, isCoreRun, processId, pdbDir);
+                    return ProcessEtlCore(nonZipEtlPath, canHideMethodSignature, isCoreRun, processId, timeStampRange, pdbDir);
                 }
                 finally
                 {
@@ -274,10 +282,10 @@ namespace EzJit
             }
 
             var etlPath = Path.GetFullPath(etlOrEtlZipFilePath);
-            return ProcessEtlCore(etlPath, canHideSignature, isCoreRun, processId, pdbDir);
+            return ProcessEtlCore(etlPath, canHideMethodSignature, isCoreRun, processId, timeStampRange, pdbDir);
         }
 
-        static (List<JitMethodData>, List<MethodCallData> managedCalls, List<MethodCallData> nativeCalls) ProcessEtlCore(string etlFilePath, bool canHideSignature, bool isCoreRun, int processId, string pdbDir)
+        static (List<JitMethodData>, List<MethodCallData> managedCalls, List<MethodCallData> nativeCalls) ProcessEtlCore(string etlFilePath, bool canHideMethodSignature, bool isCoreRun, int processId, TimeStampRange timeStampRange, string pdbDir)
         {
             TextWriter SymbolLookupMessages = new StringWriter();
             var symbolPath = new SymbolPath(SymbolPath.SymbolPathFromEnvironment).Add(SymbolPath.MicrosoftSymbolServerPath).Add(pdbDir);
@@ -314,11 +322,17 @@ namespace EzJit
 
                 var evts = p.EventsInProcess.Filter(x =>
                 {
+                    if (timeStampRange != null)
+                    {
+                        if (x.TimeStampRelativeMSec < timeStampRange.Start || x.TimeStampRelativeMSec > timeStampRange.End)
+                            return false;
+                    }
+
                     var callStack = x.CallStack();
                     if (callStack != null)
                     {
                         var mname = callStack.CodeAddress.ModuleName;
-                        if (mname.Contains("."))
+                        if (mname.Contains(".") || mname.StartsWith("ManagedModule"))
                         {
                             return true;
                         }
@@ -337,11 +351,17 @@ namespace EzJit
 
                 var evts2 = p.EventsInProcess.Filter(x =>
                 {
+                    if (timeStampRange != null)
+                    {
+                        if (x.TimeStampRelativeMSec < timeStampRange.Start || x.TimeStampRelativeMSec > timeStampRange.End)
+                            return false;
+                    }
+
                     var callStack = x.CallStack();
                     if (callStack != null)
                     {
                         var mname = callStack.CodeAddress.ModuleName;
-                        if (!mname.Contains("."))
+                        if (!mname.Contains(".") && !mname.StartsWith("ManagedModule"))
                         {
                             ResolveNativeCode(callStack, symbolReader);
                             return true;
@@ -366,6 +386,12 @@ namespace EzJit
 
             void Clr_MethodJittingStarted(MethodJittingStartedTraceData data)
             {
+                if (timeStampRange != null)
+                {
+                    if (data.TimeStampRelativeMSec < timeStampRange.Start || data.TimeStampRelativeMSec > timeStampRange.End)
+                        return;
+                }
+
                 var m = new JitMethodData();
 
                 var index = data.MethodSignature.IndexOf('(');
@@ -373,7 +399,7 @@ namespace EzJit
                 {
                     var name = data.MethodNamespace + "::" + data.MethodName;
 
-                    if (canHideSignature)
+                    if (canHideMethodSignature)
                     {
                         m.FullyQualifiedName = name;
                     }
@@ -390,6 +416,12 @@ namespace EzJit
 
             void Clr_MethodLoadVerbose(MethodLoadUnloadVerboseTraceData data)
             {
+                if (timeStampRange != null)
+                {
+                    if (data.TimeStampRelativeMSec < timeStampRange.Start || data.TimeStampRelativeMSec > timeStampRange.End)
+                        return;
+                }
+
                 JitMethodData m;
                 if (methodLookup.TryGetValue(data.MethodID, out m))
                 {
@@ -425,19 +457,23 @@ namespace EzJit
         {
             public class Settings : CommandSettings
             {
-                [CommandArgument(0, "<arch>")]
+                [CommandArgument(0, "<output-etl>")]
+                public string EtlFilePath { get; set; }
+
+                [CommandArgument(1, "<arch>")]
                 public string Architecture { get; set; }
 
-                [CommandArgument(1, "<config>")]
+                [CommandArgument(2, "<config>")]
                 public string Configuration { get; set; }
 
-                [CommandArgument(2, "<exe/dll>")]
+                [CommandArgument(3, "<exe/dll>")]
                 public string DotNetExeOrDllPath { get; set; }
 
-                [CommandArgument(3, "[args]")]
+                [CommandArgument(4, "[args]")]
                 public string[] Arguments { get; set; }
 
                 [CommandOption("--analyze")]
+                [Description("Analyze ETL.")]
                 public bool CanAnalyze { get; set; }
             }
 
@@ -450,7 +486,7 @@ namespace EzJit
                 var (corerunExe, _, corerunExeArgs, corerunExeEnvVars) = GetRunArguments(settings.Architecture, settings.Configuration, settings.DotNetExeOrDllPath, settings.Arguments);
                 var coreRoot = Path.GetDirectoryName(corerunExe);
 
-                var etlFilePath = "PerfViewData.etl";
+                var etlFilePath = settings.EtlFilePath;
 
                 var perfViewExe = Configuration.PerfViewExePath;
                 var args = new List<string>();
@@ -487,7 +523,7 @@ namespace EzJit
 
                 if (settings.CanAnalyze)
                 {
-                    var (jitMethods, managedCalls, nativeCalls) = ProcessEtl(etlFilePath + ".zip", true, true, -1, Path.Combine(coreRoot, "\\PDB"));
+                    var (jitMethods, managedCalls, nativeCalls) = ProcessEtl(etlFilePath + ".zip", true, true, -1, null, Path.Combine(coreRoot, "\\PDB"));
                     AnsiConsole.WriteLine("");
                     PrintTop20SlowestJittedMethods(jitMethods);
                     AnsiConsole.WriteLine("");
@@ -573,13 +609,27 @@ namespace EzJit
                 [CommandArgument(1, "<process-id>")]
                 public int ProcessId { get; set; }
 
-                [CommandOption("--hide-sig")]
-                public bool CanHideSignature { get; set; }
+                [CommandOption("--start")]
+                [Description("Filter events by time-stamps greater-than or equal to this value.")]
+                [DefaultValue((double)0)]
+                public double Start { get; set; }
+
+                [CommandOption("--end")]
+                [Description("Filter events by time-stamps less-than or equal to this value.")]
+                [DefaultValue(Double.MaxValue)]
+                public double End { get; set; }
+
+                [CommandOption("--hide-meth-sig")]
+                [Description("Hide method signatures.")]
+                public bool CanHideMethodSignature { get; set; }
             }
 
             public override int Execute(CommandContext context, Settings settings)
             {
-                var (jitMethods, managedCalls, nativeCalls) = ProcessEtl(settings.EtlFilePath, settings.CanHideSignature, false, settings.ProcessId, string.Empty);
+                var range = new TimeStampRange();
+                range.Start = settings.Start;
+                range.End = settings.End;
+                var (jitMethods, managedCalls, nativeCalls) = ProcessEtl(settings.EtlFilePath, settings.CanHideMethodSignature, false, settings.ProcessId, range, string.Empty);
                 AnsiConsole.WriteLine("");
                 PrintTop20SlowestJittedMethods(jitMethods);
                 AnsiConsole.WriteLine("");
