@@ -28,6 +28,7 @@ namespace EzJit
 
         static (List<JitMethodData>, List<MethodCallData> managedCalls, List<MethodCallData> nativeCalls) ProcessEtlCore(string etlFilePath, bool canHideMethodSignature, bool isCoreRun, int processId, TimeStampRange timeStampRange, string pdbDir)
         {
+            HashSet<ModuleFileIndex> moduleSymbolsLoaded = new();
             TextWriter SymbolLookupMessages = new StringWriter();
             var symbolPath = new SymbolPath(SymbolPath.SymbolPathFromEnvironment).Add(SymbolPath.MicrosoftSymbolServerPath).Add(pdbDir);
             SymbolReader symbolReader = new SymbolReader(SymbolLookupMessages, symbolPath.ToString());
@@ -141,7 +142,7 @@ namespace EzJit
                 var stackSource = new TraceEventStackSource(evts);
                 callTree.StackSource = stackSource;
 
-                foreach (var call in callTree.ByIDSortedExclusiveMetric().Take(20))
+                foreach (var call in callTree.ByIDSortedExclusiveMetric().Take(EzJit.NumberOfMethodsToProcess))
                 {
                     managedCalls.Add(new MethodCallData() { Name = call.Name, ExclusivePercent = call.ExclusiveMetricPercent, ExclusiveCount = (int)call.ExclusiveCount, InclusivePercent = call.InclusiveMetricPercent, InclusiveCount = (int)call.InclusiveCount });
                 }
@@ -157,7 +158,7 @@ namespace EzJit
                         var mname = callStack.CodeAddress.ModuleName;
                         if (!mname.Contains(".") && !mname.StartsWith("ManagedModule"))
                         {
-                            ResolveNativeCode(callStack, symbolReader);
+                            ResolveNativeCode(moduleSymbolsLoaded, callStack, symbolReader);
                             return true;
                         }
                     }
@@ -168,15 +169,20 @@ namespace EzJit
                 var stackSource2 = new TraceEventStackSource(evts2);
                 callTree2.StackSource = stackSource2;
 
-                foreach (var call in callTree2.ByIDSortedExclusiveMetric().Take(20))
+                foreach (var call in callTree2.ByIDSortedExclusiveMetric().Take(EzJit.NumberOfMethodsToProcess))
                 {
                     nativeCalls.Add(new MethodCallData() { Name = call.Name, ExclusivePercent = call.ExclusiveMetricPercent, ExclusiveCount = (int)call.ExclusiveCount, InclusivePercent = call.InclusiveMetricPercent, InclusiveCount = (int)call.InclusiveCount });
                 }
 
+                traceLog.Dispose();
+
                 source.Process();
             }
 
-            return (methods.Where(x => x.EndTime != 0).ToList(), managedCalls, nativeCalls);
+            symbolReader.Dispose();
+            SymbolLookupMessages.Dispose();
+
+            return (methods.Where(x => x.EndTime != 0).OrderByDescending(x => x.Time).Take(EzJit.NumberOfMethodsToProcess).ToList(), managedCalls, nativeCalls);
 
             void Clr_MethodJittingStarted(MethodJittingStartedTraceData data)
             {
@@ -218,12 +224,11 @@ namespace EzJit
             }
         }
 
-        static HashSet<ModuleFileIndex> moduleSymbolsLoaded = new();
         /// <summary>
         /// Because it is expensive and often unnecessary, lookup of native symbols needs to be explicitly requested.  
         /// Here we do this for every frame in the stack.     Note that this is not needed for JIT compiled managed code. 
         /// </summary>
-        static void ResolveNativeCode(TraceCallStack callStack, SymbolReader symbolReader)
+        static void ResolveNativeCode(HashSet<ModuleFileIndex> moduleSymbolsLoaded, TraceCallStack callStack, SymbolReader symbolReader)
         {
             var codeAddress = callStack.CodeAddress;
             if (codeAddress.Method == null)

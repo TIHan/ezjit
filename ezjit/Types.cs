@@ -26,6 +26,17 @@ namespace EzJit
 
     }
 
+    sealed class JitMethodDataDiff
+    {
+        public string FullyQualifiedName { get; set; }
+
+        public double StartTime { get; set; }
+
+        public double EndTime { get; set; }
+
+        public double Time { get; set; }
+    }
+
     sealed class MethodCallData
     {
         public string Name { get; set; }

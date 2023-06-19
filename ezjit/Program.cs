@@ -116,22 +116,22 @@ namespace EzJit
                 {
                     var (jitMethods, managedCalls, nativeCalls) = EtlProcessing.ProcessEtl(etlFilePath + ".zip", true, true, -1, new TimeStampRange(), Path.Combine(coreRoot, "\\PDB"));
                     AnsiConsole.WriteLine("");
-                    PrintTop20SlowestJittedMethods(jitMethods);
+                    PrintTopSlowestJittedMethods(jitMethods);
                     AnsiConsole.WriteLine("");
-                    PrintTop20SlowestManagedMethodCalls(managedCalls);
+                    PrintTopSlowestManagedMethodCalls(managedCalls);
                     AnsiConsole.WriteLine("");
-                    PrintTop20SlowestNativeMethodCalls(nativeCalls);
+                    PrintTopSlowestNativeMethodCalls(nativeCalls);
                 }
 
                 return exitCode;
             }
         }
 
-        static void PrintTop20SlowestJittedMethods(List<JitMethodData> jitMethods)
+        static void PrintTopSlowestJittedMethods(List<JitMethodData> jitMethods)
         {
-            jitMethods = jitMethods.OrderByDescending(x => x.Time).Take(20).ToList();
+            jitMethods = jitMethods.OrderByDescending(x => x.Time).Take(EzJit.NumberOfMethodsToPrint).ToList();
 
-            AnsiConsole.MarkupLine("[purple]Top 20 Slowest Jitted Methods[/]");
+            AnsiConsole.MarkupLine("[purple]Top Slowest Jitted Methods[/]");
 
             var grid = new Grid();
             grid.AddColumn();
@@ -146,11 +146,11 @@ namespace EzJit
             AnsiConsole.Write(grid);
         }
 
-        static void PrintTop20SlowestManagedMethodCalls(List<MethodCallData> methodCalls)
+        static void PrintTopSlowestManagedMethodCalls(List<MethodCallData> methodCalls)
         {
-            methodCalls = methodCalls.OrderByDescending(x => x.ExclusivePercent).Take(20).ToList();
+            methodCalls = methodCalls.OrderByDescending(x => x.ExclusivePercent).Take(EzJit.NumberOfMethodsToPrint).ToList();
 
-            AnsiConsole.MarkupLine("[purple]Top 20 Slowest Managed Method Calls[/]");
+            AnsiConsole.MarkupLine("[purple]Top Slowest Managed Method Calls[/]");
 
             var grid = new Grid();
             grid.AddColumn();
@@ -168,11 +168,11 @@ namespace EzJit
             AnsiConsole.Write(grid);
         }
 
-        static void PrintTop20SlowestNativeMethodCalls(List<MethodCallData> methodCalls)
+        static void PrintTopSlowestNativeMethodCalls(List<MethodCallData> methodCalls)
         {
-            methodCalls = methodCalls.OrderByDescending(x => x.ExclusivePercent).Take(20).ToList();
+            methodCalls = methodCalls.OrderByDescending(x => x.ExclusivePercent).Take(EzJit.NumberOfMethodsToPrint).ToList();
 
-            AnsiConsole.MarkupLine("[purple]Top 20 Slowest Native Method Calls[/]");
+            AnsiConsole.MarkupLine("[purple]Top Slowest Native Method Calls[/]");
 
             var grid = new Grid();
             grid.AddColumn();
@@ -188,6 +188,178 @@ namespace EzJit
             }
 
             AnsiConsole.Write(grid);
+        }
+
+        static void PrintTopSlowestJittedMethodsDiff(List<JitMethodDataDiff> jitMethods)
+        {
+            jitMethods = jitMethods.OrderByDescending(x => x.Time).Take(EzJit.NumberOfMethodsToPrint).ToList();
+
+            AnsiConsole.MarkupLine("[purple]Top Slowest Jitted Methods - Diffs[/]");
+
+            var grid = new Grid();
+            grid.AddColumn();
+            grid.AddColumn();
+            grid.AddRow(new string[] { "Name", "Diff Jit Time(ms)" });
+
+            foreach (var jitMethod in jitMethods)
+            {
+                grid.AddRow(new string[] { Markup.Escape(jitMethod.FullyQualifiedName), jitMethod.Time.ToString("F04", CultureInfo.InvariantCulture) });
+            }
+
+            AnsiConsole.Write(grid);
+        }
+
+        static void PrintTopSlowestManagedMethodCallsDiff(List<MethodCallData> methodCalls)
+        {
+            methodCalls = methodCalls.OrderByDescending(x => x.ExclusivePercent).Take(EzJit.NumberOfMethodsToPrint).ToList();
+
+            AnsiConsole.MarkupLine("[purple]Top Slowest Managed Method Calls - Diffs[/]");
+
+            var grid = new Grid();
+            grid.AddColumn();
+            grid.AddColumn();
+            grid.AddColumn();
+            grid.AddColumn();
+            grid.AddColumn();
+            grid.AddRow(new string[] { "Name", "Diff Exc %", "Diff Exc", "Diff Inc %", "Diff Inc" });
+
+            foreach (var call in methodCalls)
+            {
+                grid.AddRow(new string[] { Markup.Escape(call.Name), call.ExclusivePercent.ToString("F04", CultureInfo.InvariantCulture), call.ExclusiveCount.ToString(), call.InclusivePercent.ToString("F04", CultureInfo.InvariantCulture), call.InclusiveCount.ToString() });
+            }
+
+            AnsiConsole.Write(grid);
+        }
+
+        static void PrintTopSlowestNativeMethodCallsDiff(List<MethodCallData> methodCalls)
+        {
+            methodCalls = methodCalls.OrderByDescending(x => x.ExclusivePercent).Take(EzJit.NumberOfMethodsToPrint).ToList();
+
+            AnsiConsole.MarkupLine("[purple]Top Slowest Native Method Calls - Diffs[/]");
+
+            var grid = new Grid();
+            grid.AddColumn();
+            grid.AddColumn();
+            grid.AddColumn();
+            grid.AddColumn();
+            grid.AddColumn();
+            grid.AddRow(new string[] { "Name", "Diff Exc %", "Diff Exc", "Diff Inc %", "Diff Inc" });
+
+            foreach (var call in methodCalls)
+            {
+                grid.AddRow(new string[] { Markup.Escape(call.Name), call.ExclusivePercent.ToString("F04", CultureInfo.InvariantCulture), call.ExclusiveCount.ToString(), call.InclusivePercent.ToString("F04", CultureInfo.InvariantCulture), call.InclusiveCount.ToString() });
+            }
+
+            AnsiConsole.Write(grid);
+        }
+
+        public static ValidationResult ValidateAnalyzeEtl<T>(CommandContext context, T settings, Func<CommandContext, T, ValidationResult> validate) where T : AnalyzeEtlCommand.Settings
+        {
+            if (settings.Start != 0 && !string.IsNullOrWhiteSpace(settings.StartEventName))
+            {
+                return ValidationResult.Error("'--start' and '--start-event' cannot be used at the same time.");
+            }
+
+            if (settings.End != double.MaxValue && !string.IsNullOrWhiteSpace(settings.EndEventName))
+            {
+                return ValidationResult.Error("'--end' and '--end-event' cannot be used at the same time.");
+            }
+
+            return validate(context, settings);
+        }
+
+        public class AnalyzeEtlDiffCommand : Command<AnalyzeEtlDiffCommand.Settings>
+        {
+            public class Settings : AnalyzeEtlCommand.Settings
+            {
+                [CommandArgument(2, "<base-etl/etl.zip>")]
+                public string BaseEtlFilePath { get; set; }
+
+                [CommandArgument(3, "<base-process-id>")]
+                public int BaseProcessId { get; set; }
+            }
+
+            public override ValidationResult Validate(CommandContext context, Settings settings)
+            {
+                return ValidateAnalyzeEtl(context, settings, base.Validate);
+            }
+
+            public override int Execute(CommandContext context, Settings settings)
+            {
+                var range = new TimeStampRange();
+                range.Start = settings.Start;
+                range.End = settings.End;
+                range.StartEventName = settings.StartEventName;
+                range.EndEventName = settings.EndEventName;
+                var (jitMethods, managedCalls, nativeCalls) = EtlProcessing.ProcessEtl(settings.EtlFilePath, settings.CanHideMethodSignature, false, settings.ProcessId, range, string.Empty);
+                var (jitMethodsBase, managedCallsBase, nativeCallsBase) = EtlProcessing.ProcessEtl(settings.BaseEtlFilePath, settings.CanHideMethodSignature, false, settings.BaseProcessId, range, string.Empty);
+
+                var jitMethodsDiff = new List<JitMethodDataDiff>();
+                var managedCallsDiff = new List<MethodCallData>();
+                var nativeCallsDiff = new List<MethodCallData>();
+
+                var jitMethodsLookup = new Dictionary<string, JitMethodData>();
+                foreach (var x in jitMethods)
+                {
+                    jitMethodsLookup[x.FullyQualifiedName] = x;
+                }
+                foreach (var y in jitMethodsBase)
+                {
+                    if (jitMethodsLookup.TryGetValue(y.FullyQualifiedName, out var x))
+                    {
+                        var data = new JitMethodDataDiff();
+                        data.FullyQualifiedName = x.FullyQualifiedName;
+                        data.Time = x.Time - y.Time;
+                        jitMethodsDiff.Add(data);
+                    }
+                }
+
+                var managedCallsLookup = new Dictionary<string, MethodCallData>();
+                foreach (var x in managedCalls)
+                {
+                    managedCallsLookup[x.Name] = x;
+                }
+                foreach (var y in managedCallsBase)
+                {
+                    if (managedCallsLookup.TryGetValue(y.Name, out var x))
+                    {
+                        var data = new MethodCallData();
+                        data.Name = x.Name;
+                        data.ExclusivePercent = x.ExclusivePercent - y.ExclusivePercent;
+                        data.ExclusiveCount = x.ExclusiveCount - y.ExclusiveCount;
+                        data.InclusivePercent = x.InclusivePercent - y.InclusivePercent;
+                        data.InclusiveCount = x.InclusiveCount - y.InclusiveCount;
+                        managedCallsDiff.Add(data);
+                    }
+                }
+
+                var nativeCallsLookup = new Dictionary<string, MethodCallData>();
+                foreach (var x in nativeCalls)
+                {
+                    nativeCallsLookup[x.Name] = x;
+                }
+                foreach (var y in nativeCallsBase)
+                {
+                    if (nativeCallsLookup.TryGetValue(y.Name, out var x))
+                    {
+                        var data = new MethodCallData();
+                        data.Name = x.Name;
+                        data.ExclusivePercent = x.ExclusivePercent - y.ExclusivePercent;
+                        data.ExclusiveCount = x.ExclusiveCount - y.ExclusiveCount;
+                        data.InclusivePercent = x.InclusivePercent - y.InclusivePercent;
+                        data.InclusiveCount = x.InclusiveCount - y.InclusiveCount;
+                        nativeCallsDiff.Add(data);
+                    }
+                }
+
+                AnsiConsole.WriteLine("");
+                PrintTopSlowestJittedMethodsDiff(jitMethodsDiff);
+                AnsiConsole.WriteLine("");
+                PrintTopSlowestManagedMethodCallsDiff(managedCallsDiff);
+                AnsiConsole.WriteLine("");
+                PrintTopSlowestNativeMethodCallsDiff(nativeCallsDiff);
+                return 0;
+            }
         }
 
         public class AnalyzeEtlCommand : Command<AnalyzeEtlCommand.Settings>
@@ -225,17 +397,7 @@ namespace EzJit
 
             public override ValidationResult Validate(CommandContext context, Settings settings)
             {
-                if (settings.Start != 0 && !string.IsNullOrWhiteSpace(settings.StartEventName))
-                {
-                    return ValidationResult.Error("'--start' and '--start-event' cannot be used at the same time.");
-                }
-
-                if (settings.End != double.MaxValue && !string.IsNullOrWhiteSpace(settings.EndEventName))
-                {
-                    return ValidationResult.Error("'--end' and '--end-event' cannot be used at the same time.");
-                }
-
-                return base.Validate(context, settings);
+                return ValidateAnalyzeEtl(context, settings, base.Validate);
             }
 
             public override int Execute(CommandContext context, Settings settings)
@@ -247,11 +409,11 @@ namespace EzJit
                 range.EndEventName = settings.EndEventName;
                 var (jitMethods, managedCalls, nativeCalls) = EtlProcessing.ProcessEtl(settings.EtlFilePath, settings.CanHideMethodSignature, false, settings.ProcessId, range, string.Empty);
                 AnsiConsole.WriteLine("");
-                PrintTop20SlowestJittedMethods(jitMethods);
+                PrintTopSlowestJittedMethods(jitMethods);
                 AnsiConsole.WriteLine("");
-                PrintTop20SlowestManagedMethodCalls(managedCalls);
+                PrintTopSlowestManagedMethodCalls(managedCalls);
                 AnsiConsole.WriteLine("");
-                PrintTop20SlowestNativeMethodCalls(nativeCalls);
+                PrintTopSlowestNativeMethodCalls(nativeCalls);
                 return 0;
             }
         }
@@ -413,6 +575,7 @@ namespace EzJit
                 config.AddCommand<RunCommand>("run");
                 config.AddCommand<TraceCommand>("trace").WithExample(new string[] { "trace --providers \"ClrPrivate,PaintDotNetTrace\" \"paintdotnet.etl\" x64 release \"C:\\Program Files\\paint.net\\paintdotnet.dll\" /returnOnShownTime" });
                 config.AddCommand<AnalyzeEtlCommand>("analyze-etl").WithExample(new string[] { "analyze-etl \"paintdotnet.etl.zip\" 17180 --start-event \"PaintDotNetTrace/AppStarted\" --end-event \"PaintDotNetTrace/AppReady\"" });
+                config.AddCommand<AnalyzeEtlDiffCommand>("analyze-etl-diff");
             });
 
             try

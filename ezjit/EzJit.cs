@@ -55,5 +55,8 @@ namespace EzJit
             }
             catch { }
         }
+
+        public const int NumberOfMethodsToProcess = 10000;
+        public const int NumberOfMethodsToPrint = 20;
     }
 }

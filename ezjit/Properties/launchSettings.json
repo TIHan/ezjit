@@ -2,7 +2,7 @@
   "profiles": {
     "ezjit": {
       "commandName": "Project",
-      "commandLineArgs": "analyze-etl \"C:\\work\\CompilerBenchmarks.StageBenchmarks.CompileMethodsAndEmit_arm64.etl\" 15568"
+      "commandLineArgs": "analyze-etl-diff \"C:\\work\\CompilerBenchmarks.StageBenchmarks.CompileMethodsAndEmit_arm64.etl\" 15568 \"C:\\work\\CompilerBenchmarks.StageBenchmarks.CompileMethodsAndEmit_arm64.etl\" 15568"
     }
   }
 }
