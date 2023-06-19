@@ -42,5 +42,13 @@ namespace EzJit
 
         public double End { get; set; }
         public string EndEventName { get; set; }
+
+        public bool IsDefault
+        {
+            get
+            {
+                return this.Start == 0 && this.End == double.MaxValue;
+            }
+        }
     }
 }

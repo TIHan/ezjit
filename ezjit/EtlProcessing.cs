@@ -9,11 +9,23 @@ using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using static System.Runtime.InteropServices.JavaScript.JSType;
+using System.Collections;
 
 namespace EzJit
 {
     static class EtlProcessing
     {
+        static bool FilterTraceEvent(List<TimeStampRange> timeStampRanges, TraceEvent data)
+        {
+            if (timeStampRanges.Count == 0)
+            {
+                return true;
+            }
+
+            return timeStampRanges.Exists((r) => (data.TimeStampRelativeMSec >= r.Start && data.TimeStampRelativeMSec <= r.End));
+        }
+
         static (List<JitMethodData>, List<MethodCallData> managedCalls, List<MethodCallData> nativeCalls) ProcessEtlCore(string etlFilePath, bool canHideMethodSignature, bool isCoreRun, int processId, TimeStampRange timeStampRange, string pdbDir)
         {
             TextWriter SymbolLookupMessages = new StringWriter();
@@ -32,14 +44,63 @@ namespace EzJit
             var managedCalls = new List<MethodCallData>();
             var nativeCalls = new List<MethodCallData>();
 
+            var timeStampRanges = new List<TimeStampRange>();
+
             // Pre-process to get time-stamps for the first occurence of the start and/or end events.
-            if (timeStampRange != null && !string.IsNullOrWhiteSpace(timeStampRange.StartEventName) || !string.IsNullOrWhiteSpace(timeStampRange.EndEventName))
+            if (!string.IsNullOrWhiteSpace(timeStampRange.StartEventName) || !string.IsNullOrWhiteSpace(timeStampRange.EndEventName))
             {
                 using (var source = new ETWTraceEventSource(etlFilePath))
                 {
-                    source.Dynamic.All += AllEvents;
+                    source.Dynamic.All += (TraceEvent obj) =>
+                    {
+                        if (!string.IsNullOrWhiteSpace(timeStampRange.StartEventName) && timeStampRange.Start == 0 && obj.FullEventName() == timeStampRange.StartEventName)
+                        {
+                            timeStampRange.Start = obj.TimeStampRelativeMSec;
+                        }
+
+                        if (!string.IsNullOrWhiteSpace(timeStampRange.EndEventName) && timeStampRange.End == double.MaxValue && obj.FullEventName() == timeStampRange.EndEventName)
+                        {
+                            timeStampRange.End = obj.TimeStampRelativeMSec;
+                        }
+                    };
                     source.Process();
                 }
+
+                timeStampRanges.Add(timeStampRange);
+            }
+            else if (timeStampRange.IsDefault)
+            {
+                using (var source = new ETWTraceEventSource(etlFilePath))
+                {
+                    source.Dynamic.All += 
+                        (TraceEvent obj) => { 
+                            switch (obj.FullEventName())
+                            {
+                                case "BenchmarkDotNet.EngineEventSource/WorkloadActual/Start":
+                                    {
+                                        var bdnTimeStampRange = new TimeStampRange();
+                                        bdnTimeStampRange.Start = obj.TimeStampRelativeMSec;
+                                        timeStampRanges.Add(bdnTimeStampRange);
+                                    }
+                                    break;
+
+                                case "BenchmarkDotNet.EngineEventSource/WorkloadActual/Stop":
+                                    {
+                                        var bdnTimeStampRange = timeStampRanges[timeStampRanges.Count - 1];
+                                        bdnTimeStampRange.End = obj.TimeStampRelativeMSec;
+                                    }
+                                    break;
+
+                                default:
+                                    break;
+                            }
+                        };
+                    source.Process();
+                }
+            }
+            else
+            {
+                timeStampRanges.Add(timeStampRange);
             }
 
             using (var source = new ETWTraceEventSource(etlFilePath))
@@ -61,11 +122,8 @@ namespace EzJit
 
                 var evts = p.EventsInProcess.Filter(x =>
                 {
-                    if (timeStampRange != null)
-                    {
-                        if (x.TimeStampRelativeMSec < timeStampRange.Start || x.TimeStampRelativeMSec > timeStampRange.End)
-                            return false;
-                    }
+                    if (!FilterTraceEvent(timeStampRanges, x))
+                        return false;
 
                     var callStack = x.CallStack();
                     if (callStack != null)
@@ -90,11 +148,8 @@ namespace EzJit
 
                 var evts2 = p.EventsInProcess.Filter(x =>
                 {
-                    if (timeStampRange != null)
-                    {
-                        if (x.TimeStampRelativeMSec < timeStampRange.Start || x.TimeStampRelativeMSec > timeStampRange.End)
-                            return false;
-                    }
+                    if (!FilterTraceEvent(timeStampRanges, x))
+                        return false;
 
                     var callStack = x.CallStack();
                     if (callStack != null)
@@ -123,26 +178,10 @@ namespace EzJit
 
             return (methods.Where(x => x.EndTime != 0).ToList(), managedCalls, nativeCalls);
 
-            void AllEvents(TraceEvent obj)
-            {
-                if (!string.IsNullOrWhiteSpace(timeStampRange.StartEventName) && timeStampRange.Start == 0 && obj.FullEventName() == timeStampRange.StartEventName)
-                {
-                    timeStampRange.Start = obj.TimeStampRelativeMSec;
-                }
-
-                if (!string.IsNullOrWhiteSpace(timeStampRange.EndEventName) && timeStampRange.End == double.MaxValue && obj.FullEventName() == timeStampRange.EndEventName)
-                {
-                    timeStampRange.End = obj.TimeStampRelativeMSec;
-                }
-            }
-
             void Clr_MethodJittingStarted(MethodJittingStartedTraceData data)
             {
-                if (timeStampRange != null)
-                {
-                    if (data.TimeStampRelativeMSec < timeStampRange.Start || data.TimeStampRelativeMSec > timeStampRange.End)
-                        return;
-                }
+                if (!FilterTraceEvent(timeStampRanges, data))
+                    return;
 
                 var m = new JitMethodData();
 
@@ -168,11 +207,8 @@ namespace EzJit
 
             void Clr_MethodLoadVerbose(MethodLoadUnloadVerboseTraceData data)
             {
-                if (timeStampRange != null)
-                {
-                    if (data.TimeStampRelativeMSec < timeStampRange.Start || data.TimeStampRelativeMSec > timeStampRange.End)
-                        return;
-                }
+                if (!FilterTraceEvent(timeStampRanges, data))
+                    return;
 
                 JitMethodData m;
                 if (methodLookup.TryGetValue(data.MethodID, out m))

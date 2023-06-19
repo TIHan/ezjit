@@ -26,108 +26,15 @@ namespace EzJit
 {
     static class Program
     {
-        static string EzJitExeDirectory
-        {
-            get
-            {
-                return Path.GetDirectoryName(typeof(Program).Assembly.Location);
-            }
-        }
-
-        static string EzJitScratchDirectory
-        {
-            get
-            {
-                return Path.Combine(EzJitExeDirectory, ".ezjit_scratch");
-            }
-        }
-
-        static string GetConfigurationPath()
-        {
-            return Path.Combine(EzJitExeDirectory, "ezjit.config.json");
-        }
-
-        static string CreateScratchDirectory()
-        {
-            var scratchPath = EzJitScratchDirectory;
-            try
-            {
-                Directory.CreateDirectory(scratchPath);
-            }
-            catch { }
-            return scratchPath;
-        }
-
-        static void ClearScratchDirectory()
-        {
-            try
-            {
-                foreach (var filePath in Directory.EnumerateFiles(EzJitScratchDirectory))
-                {
-                    try
-                    {
-                        File.Delete(filePath);
-                    }
-                    catch { }
-                }
-            }
-            catch { }
-        }
 
         static EzJitConfiguration LoadConfiguration()
         {
-            return JsonSerializer.Deserialize<EzJitConfiguration>(File.ReadAllText(GetConfigurationPath()));
+            return JsonSerializer.Deserialize<EzJitConfiguration>(File.ReadAllText(EzJit.GetConfigurationPath()));
         }
 
         static void SaveConfiguration(EzJitConfiguration config)
         {
-            File.WriteAllText(GetConfigurationPath(), JsonSerializer.Serialize(config));
-        }
-
-
-        static string GetCoreRootPath(string arch, string config)
-        {
-            var coreRootPath = $"artifacts\\tests\\coreclr\\windows.{arch}.{config}\\Tests\\Core_Root";
-            return Path.Combine(Configuration.RuntimeRepoPath, coreRootPath);
-        }
-
-        static (string corerunExe, string dotNetExeOrDll, List<string> args, List<(string, string)> envVars) 
-            GetRunArguments(string architecture, string configuration, string dotNetExeOrDllPath, string[] arguments)
-        {
-            var coreRoot = GetCoreRootPath(architecture, configuration);
-            var corerunExe = Path.Combine(coreRoot, "corerun.exe");
-            var dotNetExeOrDll = Path.GetFullPath(dotNetExeOrDllPath);
-
-            if (!Directory.Exists(coreRoot))
-            {
-                AnsiConsole.MarkupLine($"[red]'Core_Root' path not found: \"{coreRoot}\"[/]");
-                throw new ArgumentException("'Core_Root' path not found.");
-            }
-
-            if (!File.Exists(corerunExe))
-            {
-                AnsiConsole.MarkupLine($"[red]'corerun.exe' file not found: \"{corerunExe}\"[/]");
-                throw new ArgumentException("'corerun.exe' file not found.");
-            }
-
-            if (!File.Exists(dotNetExeOrDll))
-            {
-                AnsiConsole.MarkupLine($"[red]\"{dotNetExeOrDll}\" file not found.[/]");
-                throw new ArgumentException($"\"{dotNetExeOrDll}\" file not found.");
-            }
-
-            var envVars = new List<(string, string)>();
-            envVars.Add(("CORE_LIBRARIES", Path.GetDirectoryName(dotNetExeOrDll)));
-            envVars.Add(("CORE_ROOT", coreRoot));
-
-            var args = new List<string>();
-            args.Add($"\"{dotNetExeOrDll}\"");
-            if (arguments != null)
-            {
-                args.AddRange(arguments);
-            }
-
-            return (corerunExe, dotNetExeOrDll, args, envVars);
+            File.WriteAllText(EzJit.GetConfigurationPath(), JsonSerializer.Serialize(config));
         }
 
         public class TraceCommand : Command<TraceCommand.Settings>
@@ -164,7 +71,7 @@ namespace EzJit
                 CheckPerfViewExeConfiguration();
                 PrintConfiguration();
 
-                var (corerunExe, _, corerunExeArgs, corerunExeEnvVars) = GetRunArguments(settings.Architecture, settings.Configuration, settings.DotNetExeOrDllPath, settings.Arguments);
+                var (corerunExe, _, corerunExeArgs, corerunExeEnvVars) = CoreRun.GetArguments(Configuration.RuntimeRepoPath, settings.Architecture, settings.Configuration, settings.DotNetExeOrDllPath, settings.Arguments);
                 var coreRoot = Path.GetDirectoryName(corerunExe);
 
                 var etlFilePath = settings.EtlFilePath;
@@ -187,7 +94,7 @@ namespace EzJit
                 args.Add("run");
 
                 // Begin Bat
-                var batFilePath = Path.Combine(EzJitScratchDirectory, "run.bat");
+                var batFilePath = Path.Combine(EzJit.ScratchDirectory, "run.bat");
                 var bat = new StringBuilder();
                 foreach(var (key, value) in corerunExeEnvVars)
                 {
@@ -207,7 +114,7 @@ namespace EzJit
 
                 if (settings.CanAnalyze)
                 {
-                    var (jitMethods, managedCalls, nativeCalls) = EtlProcessing.ProcessEtl(etlFilePath + ".zip", true, true, -1, null, Path.Combine(coreRoot, "\\PDB"));
+                    var (jitMethods, managedCalls, nativeCalls) = EtlProcessing.ProcessEtl(etlFilePath + ".zip", true, true, -1, new TimeStampRange(), Path.Combine(coreRoot, "\\PDB"));
                     AnsiConsole.WriteLine("");
                     PrintTop20SlowestJittedMethods(jitMethods);
                     AnsiConsole.WriteLine("");
@@ -377,7 +284,7 @@ namespace EzJit
 
                 try
                 {
-                    var (corerunExe, dotNetExeOrDll, args, envVars) = GetRunArguments(settings.Architecture, settings.Configuration, settings.DotNetExeOrDllPath, settings.Arguments);
+                    var (corerunExe, dotNetExeOrDll, args, envVars) = CoreRun.GetArguments(Configuration.RuntimeRepoPath, settings.Architecture, settings.Configuration, settings.DotNetExeOrDllPath, settings.Arguments);
                     var coreRoot = Path.GetDirectoryName(corerunExe);
 
                     var collect = !string.IsNullOrWhiteSpace(settings.CollectPath);
@@ -385,7 +292,7 @@ namespace EzJit
                     if (collect)
                     {
                         var jitName = "clrjit.dll";
-                        var scratchPath = CreateScratchDirectory();
+                        var scratchPath = EzJit.CreateScratchDirectory();
                         envVars.Add(("SuperPMIShimLogPath", scratchPath));
                         envVars.Add(("SuperPMIShimPath", Path.Combine(coreRoot, jitName)));
                         envVars.Add(("DOTNET_JitName", "superpmi-shim-collector.dll"));
@@ -402,7 +309,7 @@ namespace EzJit
                             {
                             "-merge",
                             $"\"{settings.CollectPath}\"",
-                            $"\"{EzJitScratchDirectory}\\*.mc\"",
+                            $"\"{EzJit.ScratchDirectory}\\*.mc\"",
                             "-recursive",
                             "-dedup",
                             "-thin"
@@ -497,7 +404,7 @@ namespace EzJit
             }
 
             // Init
-            ClearScratchDirectory();
+            EzJit.ClearScratchDirectory();
             Configuration = LoadConfiguration();
 
             var app = new CommandApp();
@@ -514,7 +421,7 @@ namespace EzJit
             }
             finally
             {
-                ClearScratchDirectory();
+                EzJit.ClearScratchDirectory();
             }
         }
     }
