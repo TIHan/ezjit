@@ -293,7 +293,7 @@ namespace EzJit
                 [CommandArgument(1, "<process-id>")]
                 public int ProcessId { get; set; }
 
-                [CommandOption("-s|--start")]
+                [CommandOption("--start")]
                 [Description("Filter events by time-stamps greater-than or equal to this value.")]
                 [DefaultValue((double)0)]
                 public double Start { get; set; }
@@ -302,7 +302,7 @@ namespace EzJit
                 [Description("Filter events by time-stamps greater-than or equal to the time-stamp of first occurence of the given event.")]
                 public string StartEventName { get; set; }
 
-                [CommandOption("-e|--end")]
+                [CommandOption("--end")]
                 [Description("Filter events by time-stamps less-than or equal to this value.")]
                 [DefaultValue(Double.MaxValue)]
                 public double End { get; set; }
@@ -320,12 +320,12 @@ namespace EzJit
             {
                 if (settings.Start != 0 && !string.IsNullOrWhiteSpace(settings.StartEventName))
                 {
-                    return ValidationResult.Error("'--start' and '--start-event' cannot used at the same time.");
+                    return ValidationResult.Error("'--start' and '--start-event' cannot be used at the same time.");
                 }
 
                 if (settings.End != double.MaxValue && !string.IsNullOrWhiteSpace(settings.EndEventName))
                 {
-                    return ValidationResult.Error("'--end' and '--end-event' cannot used at the same time.");
+                    return ValidationResult.Error("'--end' and '--end-event' cannot be used at the same time.");
                 }
 
                 return base.Validate(context, settings);
