@@ -2,7 +2,7 @@
   "profiles": {
     "ezjit": {
       "commandName": "Project",
-      "commandLineArgs": "analyze-etl-diff \"C:\\work\\CompilerBenchmarks.StageBenchmarks.CompileMethodsAndEmit_arm64.etl\" 15568 \"C:\\work\\CompilerBenchmarks.StageBenchmarks.CompileMethodsAndEmit_arm64.etl\" 15568"
+      "commandLineArgs": "corerun C:\\work\\runtime\\artifacts\\bin\\coreclr\\windows.x64.Release\\ --disasm-meth * C:\\work\\ezjit\\ezjit\\bin\\Debug\\net7.0\\ezjit.dll"
     }
   }
 }

@@ -6,7 +6,6 @@ using System.Collections.Specialized;
 
 using Spectre.Console;
 using Spectre.Console.Cli;
-using static EzJit.Program.RunCommand;
 using System.Linq;
 using System.Diagnostics.CodeAnalysis;
 using static EzJit.Program.TraceCommand;
@@ -23,6 +22,8 @@ using System.Reflection;
 using System.ComponentModel;
 using CsvHelper;
 using CsvHelper.Configuration;
+using static EzJit.Program.AnalyzeEtlDiffCommand;
+using System.Runtime.InteropServices;
 
 namespace EzJit
 {
@@ -73,8 +74,8 @@ namespace EzJit
                 CheckPerfViewExeConfiguration();
                 PrintConfiguration();
 
-                var (corerunExe, _, corerunExeArgs, corerunExeEnvVars) = CoreRun.GetArguments(Configuration.RuntimeRepoPath, settings.Architecture, settings.Configuration, settings.DotNetExeOrDllPath, settings.Arguments);
-                var coreRoot = Path.GetDirectoryName(corerunExe);
+                var coreRoot = CoreRun.GetCoreRootPath(Configuration.RuntimeRepoPath, settings.Architecture, settings.Configuration);
+                var (corerunExe, _, corerunExeArgs, corerunExeEnvVars) = CoreRun.GetArguments(coreRoot, settings.DotNetExeOrDllPath, settings.Arguments);
 
                 var etlFilePath = settings.EtlFilePath;
 
@@ -458,9 +459,139 @@ namespace EzJit
             }
         }
 
-        public class RunCommand : Command<RunCommand.Settings>
+        static int ExecuteCoreRun(AbstractCoreRunCommandSettings settings, string coreRoot)
         {
-            public class Settings : CommandSettings
+            try
+            {
+                var (corerunExe, dotNetExeOrDll, args, envVars) = CoreRun.GetArguments(coreRoot, settings.DotNetExeOrDllPath, settings.Arguments);
+                var collect = !string.IsNullOrWhiteSpace(settings.CollectPath);
+                if (collect)
+                {
+                    var jitName = "clrjit.dll";
+                    var scratchPath = EzJit.CreateScratchDirectory();
+                    envVars.Add(("SuperPMIShimLogPath", scratchPath));
+                    envVars.Add(("SuperPMIShimPath", Path.Combine(coreRoot, jitName)));
+                    envVars.Add(("DOTNET_JitName", "superpmi-shim-collector.dll"));
+                }
+
+                var methToDump = string.Empty;
+                if (!string.IsNullOrWhiteSpace(settings.DisasmMethod))
+                {
+                    methToDump = settings.DisasmMethod;
+                }
+                if (!string.IsNullOrWhiteSpace(settings.DumpMethod))
+                {
+                    methToDump = settings.DumpMethod;
+                }
+
+                if (!string.IsNullOrWhiteSpace(settings.DumpMethod))
+                {
+                    envVars.Add(("DOTNET_JitDump", methToDump));
+                    envVars.Add(("DOTNET_JitDiffableDasm", "1"));
+                    envVars.Add(("DOTNET_JitStdOutFile", Path.Combine(Environment.CurrentDirectory, "dump_meth.txt")));
+                }
+
+                if (!string.IsNullOrWhiteSpace(settings.DisasmMethod) && string.IsNullOrWhiteSpace(settings.DumpMethod))
+                {
+                    envVars.Add(("DOTNET_JitDisasm", methToDump));
+                    envVars.Add(("DOTNET_JitDiffableDasm", "1"));
+                    envVars.Add(("DOTNET_JitStdOutFile", Path.Combine(Environment.CurrentDirectory, "dump_meth.txt")));
+                }
+
+                if (!string.IsNullOrWhiteSpace(settings.AltJit))
+                {
+                    if (!string.IsNullOrWhiteSpace(methToDump))
+                    {
+                        envVars.Add(("DOTNET_AltJit", methToDump));
+                    }
+                    envVars.Add(("DOTNET_AltJitName", settings.AltJit));
+                }
+
+                envVars.Add(("DOTNET_TieredCompilation", Convert.ToInt32(settings.Tier).ToString()));
+                envVars.Add(("DOTNET_TieredPGO", Convert.ToInt32(settings.Tier).ToString()));
+                envVars.Add(("DOTNET_ReadyToRun", "1"));
+                envVars.Add(("DOTNET_TieredPGO_InstrumentOnlyHotCode", "0"));
+                envVars.Add(("DOTNET_TC_CallCountingDelayMs", "0"));
+
+                (int exitCode, string stdOut, string stdErr) = ExternalProcess.Exec(corerunExe, args.ToArray(), envVars.ToArray(), false).Result;
+
+                // Use mcs.exe to cleanup and combine.
+                if (collect)
+                {
+                    var mcsExe = Path.Combine(coreRoot, "mcs.exe");
+                    var mcsExeArgs =
+                        new string[]
+                        {
+                            "-merge",
+                            $"\"{settings.CollectPath}\"",
+                            $"\"{EzJit.ScratchDirectory}\\*.mc\"",
+                            "-recursive",
+                            "-dedup",
+                            "-thin"
+                        };
+
+                    (int exitCode2, string stdOut2, string stdErr2) = ExternalProcess.Exec(mcsExe, mcsExeArgs, new (string, string)[] { }, false).Result;
+                }
+
+                return exitCode;
+            }
+            catch (ArgumentException)
+            {
+                return 1;
+            }
+        }
+
+
+        public abstract class AbstractCoreRunCommandSettings : CommandSettings
+        {
+            public abstract string DotNetExeOrDllPath { get; set; }
+
+            public abstract string[] Arguments { get; set; }
+
+            [CommandOption("--collect")]
+            public string CollectPath { get; set; }
+
+            [CommandOption("--dump-meth")]
+            public string DumpMethod { get; set; }
+
+            [CommandOption("--disasm-meth")]
+            public string DisasmMethod { get; set; }
+
+            [CommandOption("--alt-jit")]
+            public string AltJit { get; set; }
+
+            [CommandOption("--tier")]
+            [DefaultValue(true)]
+            public bool Tier { get; set; }
+
+            [CommandOption("--pgo")]
+            [DefaultValue(false)]
+            public bool Pgo { get; set; }
+        }
+
+        public class CoreRunCustomCommand : Command<CoreRunCustomCommand.Settings>
+        {
+            public class Settings : AbstractCoreRunCommandSettings
+            {
+                [CommandArgument(0, "<core_root>")]
+                public string CoreRoot { get; set; }
+
+                [CommandArgument(1, "<exe/dll>")]
+                public override string DotNetExeOrDllPath { get; set; }
+
+                [CommandArgument(2, "[args]")]
+                public override string[] Arguments { get; set; }
+            }
+
+            public override int Execute(CommandContext context, Settings settings)
+            {
+                return ExecuteCoreRun(settings, settings.CoreRoot);
+            }
+        }
+
+        public class CoreRunCommand : Command<CoreRunCommand.Settings>
+        {
+            public class Settings : AbstractCoreRunCommandSettings
             {
                 [CommandArgument(0, "<arch>")]
                 public string Architecture { get; set; }
@@ -469,30 +600,10 @@ namespace EzJit
                 public string Configuration { get; set; }
 
                 [CommandArgument(2, "<exe/dll>")]
-                public string DotNetExeOrDllPath { get; set; }
+                public override string DotNetExeOrDllPath { get; set; }
 
                 [CommandArgument(3, "[args]")]
-                public string[] Arguments { get; set; }
-
-                [CommandOption("--collect")]
-                public string CollectPath { get; set; }
-
-                [CommandOption("--dump-meth")]
-                public string DumpMethod { get; set; }
-
-                [CommandOption("--disasm-meth")]
-                public string DisasmMethod { get; set; }
-
-                [CommandOption("--alt-jit")]
-                public string AltJit { get; set; }
-
-                [CommandOption("--tier")]
-                [DefaultValue(true)]
-                public bool Tier { get; set; }
-
-                [CommandOption("--tier")]
-                [DefaultValue(false)]
-                public bool Pgo { get; set; }
+                public override string[] Arguments { get; set; }
             }
 
             public override int Execute(CommandContext context, Settings settings)
@@ -500,87 +611,7 @@ namespace EzJit
                 CheckRuntimeRepositoryConfiguration();
                 PrintConfiguration();
 
-                try
-                {
-                    var (corerunExe, dotNetExeOrDll, args, envVars) = CoreRun.GetArguments(Configuration.RuntimeRepoPath, settings.Architecture, settings.Configuration, settings.DotNetExeOrDllPath, settings.Arguments);
-                    var coreRoot = Path.GetDirectoryName(corerunExe);
-
-                    var collect = !string.IsNullOrWhiteSpace(settings.CollectPath);
-
-                    if (collect)
-                    {
-                        var jitName = "clrjit.dll";
-                        var scratchPath = EzJit.CreateScratchDirectory();
-                        envVars.Add(("SuperPMIShimLogPath", scratchPath));
-                        envVars.Add(("SuperPMIShimPath", Path.Combine(coreRoot, jitName)));
-                        envVars.Add(("DOTNET_JitName", "superpmi-shim-collector.dll"));
-                    }
-
-                    var methToDump = string.Empty;
-                    if (!string.IsNullOrWhiteSpace(settings.DisasmMethod))
-                    {
-                        methToDump = settings.DisasmMethod;
-                    }
-                    if (!string.IsNullOrWhiteSpace(settings.DumpMethod))
-                    {
-                        methToDump = settings.DumpMethod;
-                    }
-
-                    if (!string.IsNullOrWhiteSpace(settings.DumpMethod))
-                    {
-                        envVars.Add(("DOTNET_JitDump", methToDump));
-                        envVars.Add(("DOTNET_JitDiffableDasm", "1"));
-                        envVars.Add(("DOTNET_JitStdOutFile", Path.Combine(Environment.CurrentDirectory, "dump_meth.txt")));
-                    }
-
-                    if (!string.IsNullOrWhiteSpace(settings.DisasmMethod) && string.IsNullOrWhiteSpace(settings.DumpMethod))
-                    {
-                        envVars.Add(("DOTNET_JitDisasm", methToDump));
-                        envVars.Add(("DOTNET_JitDiffableDasm", "1"));
-                        envVars.Add(("DOTNET_JitStdOutFile", Path.Combine(Environment.CurrentDirectory, "dump_meth.txt")));
-                    }
-
-                    if (!string.IsNullOrWhiteSpace(settings.AltJit))
-                    {
-                        if (!string.IsNullOrWhiteSpace(methToDump))
-                        {
-                            envVars.Add(("DOTNET_AltJit", methToDump));
-                        }
-                        envVars.Add(("DOTNET_AltJitName", settings.AltJit));
-                    }
-
-                    envVars.Add(("DOTNET_TieredCompilation", Convert.ToInt32(settings.Tier).ToString()));
-                    envVars.Add(("DOTNET_TieredPGO", Convert.ToInt32(settings.Tier).ToString()));
-                    envVars.Add(("DOTNET_ReadyToRun", "1"));
-                    envVars.Add(("DOTNET_TieredPGO_InstrumentOnlyHotCode", "0"));
-                    envVars.Add(("DOTNET_TC_CallCountingDelayMs", "0"));
-
-                    (int exitCode, string stdOut, string stdErr) = ExternalProcess.Exec(corerunExe, args.ToArray(), envVars.ToArray(), false).Result;
-
-                    // Use mcs.exe to cleanup and combine.
-                    if (collect)
-                    {
-                        var mcsExe = Path.Combine(coreRoot, "mcs.exe");
-                        var mcsExeArgs =
-                            new string[]
-                            {
-                            "-merge",
-                            $"\"{settings.CollectPath}\"",
-                            $"\"{EzJit.ScratchDirectory}\\*.mc\"",
-                            "-recursive",
-                            "-dedup",
-                            "-thin"
-                            };
-
-                        (int exitCode2, string stdOut2, string stdErr2) = ExternalProcess.Exec(mcsExe, mcsExeArgs, new (string, string)[] { }, false).Result;
-                    }
-
-                    return exitCode;
-                }
-                catch (ArgumentException)
-                {
-                    return 1;
-                }
+                return ExecuteCoreRun(settings, CoreRun.GetCoreRootPath(Configuration.RuntimeRepoPath, settings.Architecture, settings.Configuration));
             }
         }
 
@@ -667,7 +698,9 @@ namespace EzJit
             var app = new CommandApp();
             app.Configure(config =>
             {
-                config.AddCommand<RunCommand>("run");
+                config.AddCommand<CoreRunCommand>("run");
+                config.AddCommand<CoreRunCustomCommand>("corerun");
+
                 config.AddCommand<TraceCommand>("trace").WithExample(new string[] { "trace --providers \"ClrPrivate,PaintDotNetTrace\" \"paintdotnet.etl\" x64 release \"C:\\Program Files\\paint.net\\paintdotnet.dll\" /returnOnShownTime" });
                 config.AddCommand<AnalyzeEtlCommand>("analyze-etl").WithExample(new string[] { "analyze-etl \"paintdotnet.etl.zip\" 17180 --start-event \"PaintDotNetTrace/AppStarted\" --end-event \"PaintDotNetTrace/AppReady\"" });
                 config.AddCommand<AnalyzeEtlDiffCommand>("analyze-etl-diff");

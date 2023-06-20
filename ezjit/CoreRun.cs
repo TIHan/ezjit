@@ -9,18 +9,17 @@ namespace EzJit
 {
     static class CoreRun
     {
-        static string GetCoreRootPath(string runtimeRepoPath, string arch, string config)
+        public static string GetCoreRootPath(string runtimeRepoPath, string arch, string config)
         {
             var coreRootPath = $"artifacts\\tests\\coreclr\\windows.{arch}.{config}\\Tests\\Core_Root";
             return Path.Combine(runtimeRepoPath, coreRootPath);
         }
 
         public static (string corerunExe, string dotNetExeOrDll, List<string> args, List<(string, string)> envVars)
-            GetArguments(string runtimeRepoPath, string architecture, string configuration, string dotNetExeOrDllPath, string[] arguments)
+            GetArguments(string coreRoot, string dotNetExeOrDll, string[] arguments)
         {
-            var coreRoot = GetCoreRootPath(runtimeRepoPath, architecture, configuration);
             var corerunExe = Path.Combine(coreRoot, "corerun.exe");
-            var dotNetExeOrDll = Path.GetFullPath(dotNetExeOrDllPath);
+            dotNetExeOrDll = Path.GetFullPath(dotNetExeOrDll);
 
             if (!Directory.Exists(coreRoot))
             {
