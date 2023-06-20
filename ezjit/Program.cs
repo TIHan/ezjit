@@ -21,6 +21,8 @@ using Microsoft.Diagnostics.Tracing.Parsers.Clr;
 using Microsoft.Diagnostics.Tracing.Stacks;
 using System.Reflection;
 using System.ComponentModel;
+using CsvHelper;
+using CsvHelper.Configuration;
 
 namespace EzJit
 {
@@ -127,6 +129,21 @@ namespace EzJit
             }
         }
 
+        static void SaveCsvData<T>(string path, IEnumerable<T> data)
+        {
+            var csvConfig = new CsvConfiguration(CultureInfo.InvariantCulture)
+            {
+                NewLine = Environment.NewLine,
+                ShouldQuote = new ShouldQuote(_ => true)
+            };
+
+            using (var writer = new StreamWriter(path))
+            using (var csv = new CsvWriter(writer, csvConfig))
+            {
+                csv.WriteRecords(data);
+            }
+        }
+
         static void PrintTopSlowestJittedMethods(List<JitMethodData> jitMethods)
         {
             jitMethods = jitMethods.OrderByDescending(x => x.Time).Take(EzJit.NumberOfMethodsToPrint).ToList();
@@ -199,7 +216,7 @@ namespace EzJit
             var grid = new Grid();
             grid.AddColumn();
             grid.AddColumn();
-            grid.AddRow(new string[] { "Name", "Diff Jit Time(ms)" });
+            grid.AddRow(new string[] { "Name", "Jit Time(ms)" });
 
             foreach (var jitMethod in jitMethods)
             {
@@ -221,7 +238,7 @@ namespace EzJit
             grid.AddColumn();
             grid.AddColumn();
             grid.AddColumn();
-            grid.AddRow(new string[] { "Name", "Diff Exc %", "Diff Exc", "Diff Inc %", "Diff Inc" });
+            grid.AddRow(new string[] { "Name", "Exc %", "Exc", "Inc %", "Inc" });
 
             foreach (var call in methodCalls)
             {
@@ -243,7 +260,7 @@ namespace EzJit
             grid.AddColumn();
             grid.AddColumn();
             grid.AddColumn();
-            grid.AddRow(new string[] { "Name", "Diff Exc %", "Diff Exc", "Diff Inc %", "Diff Inc" });
+            grid.AddRow(new string[] { "Name", "Exc %", "Exc", "Inc %", "Inc" });
 
             foreach (var call in methodCalls)
             {
@@ -352,12 +369,21 @@ namespace EzJit
                     }
                 }
 
-                AnsiConsole.WriteLine("");
-                PrintTopSlowestJittedMethodsDiff(jitMethodsDiff);
-                AnsiConsole.WriteLine("");
-                PrintTopSlowestManagedMethodCallsDiff(managedCallsDiff);
-                AnsiConsole.WriteLine("");
-                PrintTopSlowestNativeMethodCallsDiff(nativeCallsDiff);
+                if (string.IsNullOrWhiteSpace(settings.OutputCsvPrefix))
+                {
+                    AnsiConsole.WriteLine("");
+                    PrintTopSlowestJittedMethodsDiff(jitMethodsDiff);
+                    AnsiConsole.WriteLine("");
+                    PrintTopSlowestManagedMethodCallsDiff(managedCallsDiff);
+                    AnsiConsole.WriteLine("");
+                    PrintTopSlowestNativeMethodCallsDiff(nativeCallsDiff);
+                }
+                else
+                {
+                    SaveCsvData(Path.Combine(Environment.CurrentDirectory, $"{settings.OutputCsvPrefix}_JIT_METHODS_DIFF.csv"), jitMethodsDiff);
+                    SaveCsvData(Path.Combine(Environment.CurrentDirectory, $"{settings.OutputCsvPrefix}_MANAGED_CALLS_DIFF.csv"), managedCallsDiff);
+                    SaveCsvData(Path.Combine(Environment.CurrentDirectory, $"{settings.OutputCsvPrefix}_NATIVE_CALLS_DIFF.csv"), nativeCallsDiff);
+                }
                 return 0;
             }
         }
@@ -393,6 +419,10 @@ namespace EzJit
                 [CommandOption("--hide-meth-sig")]
                 [Description("Hide method signatures.")]
                 public bool CanHideMethodSignature { get; set; }
+
+                [CommandOption("--output-csv-prefix")]
+                [Description("Output analysis data with the given prefix for the output path of each CSV file. The directory the files are created in is the one EzJit was from run.")]
+                public string OutputCsvPrefix { get; set; }
             }
 
             public override ValidationResult Validate(CommandContext context, Settings settings)
@@ -408,12 +438,22 @@ namespace EzJit
                 range.StartEventName = settings.StartEventName;
                 range.EndEventName = settings.EndEventName;
                 var (jitMethods, managedCalls, nativeCalls) = EtlProcessing.ProcessEtl(settings.EtlFilePath, settings.CanHideMethodSignature, false, settings.ProcessId, range, string.Empty);
-                AnsiConsole.WriteLine("");
-                PrintTopSlowestJittedMethods(jitMethods);
-                AnsiConsole.WriteLine("");
-                PrintTopSlowestManagedMethodCalls(managedCalls);
-                AnsiConsole.WriteLine("");
-                PrintTopSlowestNativeMethodCalls(nativeCalls);
+
+                if (string.IsNullOrEmpty(settings.OutputCsvPrefix))
+                {
+                    AnsiConsole.WriteLine("");
+                    PrintTopSlowestJittedMethods(jitMethods);
+                    AnsiConsole.WriteLine("");
+                    PrintTopSlowestManagedMethodCalls(managedCalls);
+                    AnsiConsole.WriteLine("");
+                    PrintTopSlowestNativeMethodCalls(nativeCalls);
+                }
+                else
+                {
+                    SaveCsvData(Path.Combine(Environment.CurrentDirectory, $"{settings.OutputCsvPrefix}_JIT_METHODS.csv"), jitMethods);
+                    SaveCsvData(Path.Combine(Environment.CurrentDirectory, $"{settings.OutputCsvPrefix}_MANAGED_CALLS.csv"), managedCalls);
+                    SaveCsvData(Path.Combine(Environment.CurrentDirectory, $"{settings.OutputCsvPrefix}_NATIVE_CALLS.csv"), nativeCalls);
+                }
                 return 0;
             }
         }
@@ -436,8 +476,16 @@ namespace EzJit
 
                 [CommandOption("--collect")]
                 public string CollectPath { get; set; }
-            }
 
+                [CommandOption("--dump-meth")]
+                public string DumpMethod { get; set; }
+
+                [CommandOption("--disasm-meth")]
+                public string DisasmMethod { get; set; }
+
+                [CommandOption("--alt-jit")]
+                public string AltJit { get; set; }
+            }
 
             public override int Execute(CommandContext context, Settings settings)
             {
@@ -458,6 +506,39 @@ namespace EzJit
                         envVars.Add(("SuperPMIShimLogPath", scratchPath));
                         envVars.Add(("SuperPMIShimPath", Path.Combine(coreRoot, jitName)));
                         envVars.Add(("DOTNET_JitName", "superpmi-shim-collector.dll"));
+                    }
+
+                    var methToDump = string.Empty;
+                    if (!string.IsNullOrWhiteSpace(settings.DisasmMethod))
+                    {
+                        methToDump = settings.DisasmMethod;
+                    }
+                    if (!string.IsNullOrWhiteSpace(settings.DumpMethod))
+                    {
+                        methToDump = settings.DumpMethod;
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(settings.DumpMethod))
+                    {
+                        envVars.Add(("DOTNET_JitDump", methToDump));
+                        envVars.Add(("DOTNET_JitDiffableDasm", "1"));
+                        envVars.Add(("DOTNET_JitStdOutFile", Path.Combine(Environment.CurrentDirectory, "dump_meth.txt")));
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(settings.DisasmMethod) && string.IsNullOrWhiteSpace(settings.DumpMethod))
+                    {
+                        envVars.Add(("DOTNET_JitDisasm", methToDump));
+                        envVars.Add(("DOTNET_JitDiffableDasm", "1"));
+                        envVars.Add(("DOTNET_JitStdOutFile", Path.Combine(Environment.CurrentDirectory, "dump_meth.txt")));
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(settings.AltJit))
+                    {
+                        if (!string.IsNullOrWhiteSpace(methToDump))
+                        {
+                            envVars.Add(("DOTNET_AltJit", methToDump));
+                        }
+                        envVars.Add(("DOTNET_AltJitName", settings.AltJit));
                     }
 
                     (int exitCode, string stdOut, string stdErr) = ExternalProcess.Exec(corerunExe, args.ToArray(), envVars.ToArray(), false).Result;

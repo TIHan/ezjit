@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using CsvHelper;
+using CsvHelper.Configuration.Attributes;
 
 namespace EzJit
 {
@@ -10,12 +12,18 @@ namespace EzJit
 
     sealed class JitMethodData
     {
+        [Index(0)]
+        [Name("name")]
         public string FullyQualifiedName { get; set; }
 
+        [Ignore]
         public double StartTime { get; set; }
 
+        [Ignore]
         public double EndTime { get; set; }
 
+        [Index(1)]
+        [Name("time")]
         public double Time
         {
             get
@@ -28,21 +36,41 @@ namespace EzJit
 
     sealed class JitMethodDataDiff
     {
+        [Index(0)]
+        [Name("name")]
         public string FullyQualifiedName { get; set; }
 
+        [Ignore]
         public double StartTime { get; set; }
 
+        [Ignore]
         public double EndTime { get; set; }
 
+        [Index(1)]
+        [Name("time")]
         public double Time { get; set; }
     }
 
     sealed class MethodCallData
     {
+        [Index(0)]
+        [Name("name")]
         public string Name { get; set; }
+
+        [Index(1)]
+        [Name("excp")]
         public double ExclusivePercent { get; set; }
+
+        [Index(2)]
+        [Name("exc")]
         public int ExclusiveCount { get; set; }
+
+        [Index(3)]
+        [Name("incp")]
         public double InclusivePercent { get; set; }
+
+        [Index(4)]
+        [Name("inc")]
         public int InclusiveCount { get; set; }
     }
 
