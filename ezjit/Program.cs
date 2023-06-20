@@ -485,6 +485,14 @@ namespace EzJit
 
                 [CommandOption("--alt-jit")]
                 public string AltJit { get; set; }
+
+                [CommandOption("--tier")]
+                [DefaultValue(true)]
+                public bool Tier { get; set; }
+
+                [CommandOption("--tier")]
+                [DefaultValue(false)]
+                public bool Pgo { get; set; }
             }
 
             public override int Execute(CommandContext context, Settings settings)
@@ -540,6 +548,12 @@ namespace EzJit
                         }
                         envVars.Add(("DOTNET_AltJitName", settings.AltJit));
                     }
+
+                    envVars.Add(("DOTNET_TieredCompilation", Convert.ToInt32(settings.Tier).ToString()));
+                    envVars.Add(("DOTNET_TieredPGO", Convert.ToInt32(settings.Tier).ToString()));
+                    envVars.Add(("DOTNET_ReadyToRun", "1"));
+                    envVars.Add(("DOTNET_TieredPGO_InstrumentOnlyHotCode", "0"));
+                    envVars.Add(("DOTNET_TC_CallCountingDelayMs", "0"));
 
                     (int exitCode, string stdOut, string stdErr) = ExternalProcess.Exec(corerunExe, args.ToArray(), envVars.ToArray(), false).Result;
 
