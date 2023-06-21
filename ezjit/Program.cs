@@ -357,9 +357,9 @@ namespace EzJit
                         else
                         {
                             data.ExclusivePercentDiff = y.ExclusivePercent - x.ExclusivePercent;
-                            data.ExclusiveCountDiff = y.ExclusiveCount - (double)x.ExclusiveCount;
+                            data.ExclusiveCountDiff = y.ExclusiveCount - x.ExclusiveCount;
                             data.InclusivePercentDiff = y.InclusivePercent - x.InclusivePercent;
-                            data.InclusiveCountDiff = y.InclusiveCount - (double)x.InclusiveCount);
+                            data.InclusiveCountDiff = y.InclusiveCount - x.InclusiveCount;
                         }
                         managedCallsDiff.Add(data);
                     }
@@ -386,9 +386,9 @@ namespace EzJit
                         else
                         {
                             data.ExclusivePercentDiff = y.ExclusivePercent - x.ExclusivePercent;
-                            data.ExclusiveCountDiff = y.ExclusiveCount - (double)x.ExclusiveCount;
+                            data.ExclusiveCountDiff = y.ExclusiveCount - x.ExclusiveCount;
                             data.InclusivePercentDiff = y.InclusivePercent - x.InclusivePercent;
-                            data.InclusiveCountDiff = y.InclusiveCount - (double)x.InclusiveCount);
+                            data.InclusiveCountDiff = y.InclusiveCount - x.InclusiveCount;
                         }
                         nativeCallsDiff.Add(data);
                     }
