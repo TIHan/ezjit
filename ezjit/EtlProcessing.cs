@@ -142,7 +142,7 @@ namespace EzJit
                 var stackSource = new TraceEventStackSource(evts);
                 callTree.StackSource = stackSource;
 
-                foreach (var call in callTree.ByIDSortedExclusiveMetric().Take(EzJit.NumberOfMethodsToProcess))
+                foreach (var call in callTree.ByIDSortedExclusiveMetric().Take(EzJit.NumberOfMethodsToProcess).Where(x => x.ExclusiveMetricPercent >= 0.1))
                 {
                     managedCalls.Add(new MethodCallData() { Name = call.Name, ExclusivePercent = call.ExclusiveMetricPercent, ExclusiveCount = (int)call.ExclusiveCount, InclusivePercent = call.InclusiveMetricPercent, InclusiveCount = (int)call.InclusiveCount });
                 }
@@ -169,7 +169,7 @@ namespace EzJit
                 var stackSource2 = new TraceEventStackSource(evts2);
                 callTree2.StackSource = stackSource2;
 
-                foreach (var call in callTree2.ByIDSortedExclusiveMetric().Take(EzJit.NumberOfMethodsToProcess))
+                foreach (var call in callTree2.ByIDSortedExclusiveMetric().Take(EzJit.NumberOfMethodsToProcess).Where(x => x.ExclusiveMetricPercent >= 0.1))
                 {
                     nativeCalls.Add(new MethodCallData() { Name = call.Name, ExclusivePercent = call.ExclusiveMetricPercent, ExclusiveCount = (int)call.ExclusiveCount, InclusivePercent = call.InclusiveMetricPercent, InclusiveCount = (int)call.InclusiveCount });
                 }
@@ -182,7 +182,7 @@ namespace EzJit
             symbolReader.Dispose();
             SymbolLookupMessages.Dispose();
 
-            return (methods.Where(x => x.EndTime != 0).OrderByDescending(x => x.Time).Take(EzJit.NumberOfMethodsToProcess).ToList(), managedCalls, nativeCalls);
+            return (methods.Where(x => x.EndTime != 0 && x.Time >= 0.01).OrderByDescending(x => x.Time).Take(EzJit.NumberOfMethodsToProcess).ToList(), managedCalls, nativeCalls);
 
             void Clr_MethodJittingStarted(MethodJittingStartedTraceData data)
             {

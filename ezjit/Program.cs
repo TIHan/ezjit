@@ -313,12 +313,12 @@ namespace EzJit
                 var managedCallsDiff = new List<MethodCallDataDiff>();
                 var nativeCallsDiff = new List<MethodCallDataDiff>();
 
-                var jitMethodsLookup = new Dictionary<string, JitMethodData>();
-                foreach (var x in jitMethods)
+                var jitMethodsLookup = new Dictionary<string, JitMethodData>(StringComparer.OrdinalIgnoreCase);
+                foreach (var x in jitMethodsBase)
                 {
                     jitMethodsLookup[x.FullyQualifiedName] = x;
                 }
-                foreach (var y in jitMethodsBase)
+                foreach (var y in jitMethods)
                 {
                     if (jitMethodsLookup.TryGetValue(y.FullyQualifiedName, out var x) && x.IsValid && y.IsValid)
                     {
@@ -336,12 +336,12 @@ namespace EzJit
                     }
                 }
 
-                var managedCallsLookup = new Dictionary<string, MethodCallData>();
-                foreach (var x in managedCalls)
+                var managedCallsLookup = new Dictionary<string, MethodCallData>(StringComparer.OrdinalIgnoreCase);
+                foreach (var x in managedCallsBase)
                 {
                     managedCallsLookup[x.Name] = x;
                 }
-                foreach (var y in managedCallsBase)
+                foreach (var y in managedCalls)
                 {
                     if (managedCallsLookup.TryGetValue(y.Name, out var x) && x.IsValid && y.IsValid)
                     {
@@ -365,12 +365,12 @@ namespace EzJit
                     }
                 }
 
-                var nativeCallsLookup = new Dictionary<string, MethodCallData>();
-                foreach (var x in nativeCalls)
+                var nativeCallsLookup = new Dictionary<string, MethodCallData>(StringComparer.OrdinalIgnoreCase);
+                foreach (var x in nativeCallsBase)
                 {
                     nativeCallsLookup[x.Name] = x;
                 }
-                foreach (var y in nativeCallsBase)
+                foreach (var y in nativeCalls)
                 {
                     if (nativeCallsLookup.TryGetValue(y.Name, out var x) && x.IsValid && y.IsValid)
                     {
