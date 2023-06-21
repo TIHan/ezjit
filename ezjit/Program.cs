@@ -234,11 +234,11 @@ namespace EzJit
             grid.AddColumn();
             grid.AddColumn();
             grid.AddColumn();
-            grid.AddRow(new string[] { "Name", "Exc % Diff %", "Exc Diff %", "Inc % Diff %", "Inc Diff %" });
+            grid.AddRow(new string[] { "Name", "Exc % Diff", "Exc Diff", "Inc % Diff", "Inc Diff" });
 
             foreach (var call in methodCalls)
             {
-                grid.AddRow(new string[] { Markup.Escape(call.Name), call.ExclusivePercentDiff.ToString("F04", CultureInfo.InvariantCulture), call.ExclusiveCountPercentDiff.ToString("F04", CultureInfo.InvariantCulture), call.InclusivePercentDiff.ToString("F04", CultureInfo.InvariantCulture), call.InclusiveCountPercentDiff.ToString("F04", CultureInfo.InvariantCulture) });
+                grid.AddRow(new string[] { Markup.Escape(call.Name), call.ExclusivePercentDiff.ToString("F04", CultureInfo.InvariantCulture), call.ExclusiveCountDiff.ToString("F04", CultureInfo.InvariantCulture), call.InclusivePercentDiff.ToString("F04", CultureInfo.InvariantCulture), call.InclusiveCountDiff.ToString("F04", CultureInfo.InvariantCulture) });
             }
 
             AnsiConsole.Write(grid);
@@ -254,11 +254,11 @@ namespace EzJit
             grid.AddColumn();
             grid.AddColumn();
             grid.AddColumn();
-            grid.AddRow(new string[] { "Name", "Exc % Diff %", "Exc Diff %", "Inc % Diff %", "Inc Diff %" });
+            grid.AddRow(new string[] { "Name", "Exc % Diff", "Exc Diff", "Inc % Diff", "Inc Diff" });
 
             foreach (var call in methodCalls)
             {
-                grid.AddRow(new string[] { Markup.Escape(call.Name), call.ExclusivePercentDiff.ToString("F04", CultureInfo.InvariantCulture), call.ExclusiveCountPercentDiff.ToString("F04", CultureInfo.InvariantCulture), call.InclusivePercentDiff.ToString("F04", CultureInfo.InvariantCulture), call.InclusiveCountPercentDiff.ToString("F04", CultureInfo.InvariantCulture) });
+                grid.AddRow(new string[] { Markup.Escape(call.Name), call.ExclusivePercentDiff.ToString("F04", CultureInfo.InvariantCulture), call.ExclusiveCountDiff.ToString("F04", CultureInfo.InvariantCulture), call.InclusivePercentDiff.ToString("F04", CultureInfo.InvariantCulture), call.InclusiveCountDiff.ToString("F04", CultureInfo.InvariantCulture) });
             }
 
             AnsiConsole.Write(grid);
@@ -288,6 +288,10 @@ namespace EzJit
 
                 [CommandArgument(3, "<base-process-id>")]
                 public int BaseProcessId { get; set; }
+
+                [CommandOption("--percent")]
+                [Description("Calculate diffs by percentage difference.")]
+                public bool UsePercent { get; set; }
             }
 
             public override ValidationResult Validate(CommandContext context, Settings settings)
@@ -302,8 +306,8 @@ namespace EzJit
                 range.End = settings.End;
                 range.StartEventName = settings.StartEventName;
                 range.EndEventName = settings.EndEventName;
-                var (jitMethods, managedCalls, nativeCalls) = EtlProcessing.ProcessEtl(settings.EtlFilePath, settings.CanHideMethodSignature, false, settings.ProcessId, range, string.Empty);
-                var (jitMethodsBase, managedCallsBase, nativeCallsBase) = EtlProcessing.ProcessEtl(settings.BaseEtlFilePath, settings.CanHideMethodSignature, false, settings.BaseProcessId, range, string.Empty);
+                var (jitMethods, managedCalls, nativeCalls) = EtlProcessing.ProcessEtl(settings.EtlFilePath, false, false, settings.ProcessId, range, string.Empty);
+                var (jitMethodsBase, managedCallsBase, nativeCallsBase) = EtlProcessing.ProcessEtl(settings.BaseEtlFilePath, false, false, settings.BaseProcessId, range, string.Empty);
 
                 var jitMethodsDiff = new List<JitMethodDataDiff>();
                 var managedCallsDiff = new List<MethodCallDataDiff>();
@@ -320,7 +324,14 @@ namespace EzJit
                     {
                         var data = new JitMethodDataDiff();
                         data.FullyQualifiedName = x.FullyQualifiedName;
-                        data.TimePercentDiff = (Math.Abs(y.Time - x.Time) / y.Time) * 100;
+                        if (settings.UsePercent)
+                        {
+                            data.TimePercentDiff = (Math.Abs(y.Time - x.Time) / y.Time) * 100;
+                        }
+                        else
+                        {
+                            data.TimePercentDiff = y.Time - x.Time;
+                        }
                         jitMethodsDiff.Add(data);
                     }
                 }
@@ -336,10 +347,20 @@ namespace EzJit
                     {
                         var data = new MethodCallDataDiff();
                         data.Name = x.Name;
-                        data.ExclusivePercentDiff = (Math.Abs(y.ExclusivePercent - x.ExclusivePercent) / y.ExclusivePercent) * 100;
-                        data.ExclusiveCountPercentDiff = (Math.Abs((double)y.ExclusiveCount - (double)x.ExclusiveCount) / (double)y.ExclusiveCount) * (double)100;
-                        data.InclusivePercentDiff = (Math.Abs((double)y.InclusivePercent - (double)x.InclusivePercent) / (double)y.InclusivePercent) * (double)100;
-                        data.InclusiveCountPercentDiff = (Math.Abs((double)y.InclusiveCount - (double)x.InclusiveCount) / (double)y.InclusiveCount) * (double)100;
+                        if (settings.UsePercent)
+                        {
+                            data.ExclusivePercentDiff = (Math.Abs(y.ExclusivePercent - x.ExclusivePercent) / y.ExclusivePercent) * (double)100;
+                            data.ExclusiveCountDiff = (Math.Abs((double)y.ExclusiveCount - (double)x.ExclusiveCount) / (double)y.ExclusiveCount) * (double)100;
+                            data.InclusivePercentDiff = (Math.Abs(y.InclusivePercent - x.InclusivePercent) / y.InclusivePercent) * (double)100;
+                            data.InclusiveCountDiff = (Math.Abs((double)y.InclusiveCount - (double)x.InclusiveCount) / (double)y.InclusiveCount) * (double)100;
+                        }
+                        else
+                        {
+                            data.ExclusivePercentDiff = y.ExclusivePercent - x.ExclusivePercent;
+                            data.ExclusiveCountDiff = y.ExclusiveCount - (double)x.ExclusiveCount;
+                            data.InclusivePercentDiff = y.InclusivePercent - x.InclusivePercent;
+                            data.InclusiveCountDiff = y.InclusiveCount - (double)x.InclusiveCount);
+                        }
                         managedCallsDiff.Add(data);
                     }
                 }
@@ -355,10 +376,20 @@ namespace EzJit
                     {
                         var data = new MethodCallDataDiff();
                         data.Name = x.Name;
-                        data.ExclusivePercentDiff = (Math.Abs(y.ExclusivePercent - x.ExclusivePercent) / y.ExclusivePercent) * 100;
-                        data.ExclusiveCountPercentDiff = (Math.Abs((double)y.ExclusiveCount - (double)x.ExclusiveCount) / (double)y.ExclusiveCount) * (double)100;
-                        data.InclusivePercentDiff = (Math.Abs((double)y.InclusivePercent - (double)x.InclusivePercent) / (double)y.InclusivePercent) * (double)100;
-                        data.InclusiveCountPercentDiff = (Math.Abs((double)y.InclusiveCount - (double)x.InclusiveCount) / (double)y.InclusiveCount) * (double)100;
+                        if (settings.UsePercent)
+                        {
+                            data.ExclusivePercentDiff = (Math.Abs(y.ExclusivePercent - x.ExclusivePercent) / y.ExclusivePercent) * (double)100;
+                            data.ExclusiveCountDiff = (Math.Abs((double)y.ExclusiveCount - (double)x.ExclusiveCount) / (double)y.ExclusiveCount) * (double)100;
+                            data.InclusivePercentDiff = (Math.Abs(y.InclusivePercent - x.InclusivePercent) / y.InclusivePercent) * (double)100;
+                            data.InclusiveCountDiff = (Math.Abs((double)y.InclusiveCount - (double)x.InclusiveCount) / (double)y.InclusiveCount) * (double)100;
+                        }
+                        else
+                        {
+                            data.ExclusivePercentDiff = y.ExclusivePercent - x.ExclusivePercent;
+                            data.ExclusiveCountDiff = y.ExclusiveCount - (double)x.ExclusiveCount;
+                            data.InclusivePercentDiff = y.InclusivePercent - x.InclusivePercent;
+                            data.InclusiveCountDiff = y.InclusiveCount - (double)x.InclusiveCount);
+                        }
                         nativeCallsDiff.Add(data);
                     }
                 }
@@ -414,10 +445,6 @@ namespace EzJit
                 [Description("Filter events by time-stamps less-than or equal to the time-stamp of first occurence of the given event.")]
                 public string EndEventName { get; set; }
 
-                [CommandOption("--hide-meth-sig")]
-                [Description("Hide method signatures.")]
-                public bool CanHideMethodSignature { get; set; }
-
                 [CommandOption("--output-csv-prefix")]
                 [Description("Output analysis data with the given prefix for the output path of each CSV file. The directory the files are created in is the one EzJit was from run.")]
                 public string OutputCsvPrefix { get; set; }
@@ -435,7 +462,7 @@ namespace EzJit
                 range.End = settings.End;
                 range.StartEventName = settings.StartEventName;
                 range.EndEventName = settings.EndEventName;
-                var (jitMethods, managedCalls, nativeCalls) = EtlProcessing.ProcessEtl(settings.EtlFilePath, settings.CanHideMethodSignature, false, settings.ProcessId, range, string.Empty);
+                var (jitMethods, managedCalls, nativeCalls) = EtlProcessing.ProcessEtl(settings.EtlFilePath, false, false, settings.ProcessId, range, string.Empty);
 
                 jitMethods = jitMethods.OrderByDescending(x => x.Time).Take(EzJit.NumberOfMethodsToPrint).ToList();
                 managedCalls = managedCalls.OrderByDescending(x => x.ExclusivePercent).Take(EzJit.NumberOfMethodsToPrint).ToList();

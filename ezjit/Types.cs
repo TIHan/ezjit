@@ -83,7 +83,7 @@ namespace EzJit
 
         [Index(2)]
         [Name("excp")]
-        public double ExclusiveCountPercentDiff { get; set; }
+        public double ExclusiveCountDiff { get; set; }
 
         [Index(3)]
         [Name("incpp")]
@@ -91,7 +91,7 @@ namespace EzJit
 
         [Index(4)]
         [Name("incp")]
-        public double InclusiveCountPercentDiff { get; set; }
+        public double InclusiveCountDiff { get; set; }
     }
 
     sealed class TimeStampRange
