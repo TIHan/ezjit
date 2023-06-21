@@ -327,7 +327,7 @@ namespace EzJit
                     {
                         var data = new JitMethodDataDiff();
                         data.FullyQualifiedName = x.FullyQualifiedName;
-                        data.TimePercentDiff = ((y.Time - x.Time) / y.Time) * 100;
+                        data.TimePercentDiff = (Math.Abs(y.Time - x.Time) / y.Time) * 100;
                         jitMethodsDiff.Add(data);
                     }
                 }
@@ -343,10 +343,10 @@ namespace EzJit
                     {
                         var data = new MethodCallDataDiff();
                         data.Name = x.Name;
-                        data.ExclusivePercentDiff = ((y.ExclusivePercent - x.ExclusivePercent) / y.ExclusivePercent) * 100;
-                        data.ExclusiveCountPercentDiff = (((double)y.ExclusiveCount - (double)x.ExclusiveCount) / (double)y.ExclusiveCount) * (double)100;
-                        data.InclusivePercentDiff = (((double)y.InclusivePercent - (double)x.InclusivePercent) / (double)y.InclusivePercent) * (double)100;
-                        data.InclusiveCountPercentDiff = (((double)y.InclusiveCount - (double)x.InclusiveCount) / (double)y.InclusiveCount) * (double)100;
+                        data.ExclusivePercentDiff = (Math.Abs(y.ExclusivePercent - x.ExclusivePercent) / y.ExclusivePercent) * 100;
+                        data.ExclusiveCountPercentDiff = (Math.Abs((double)y.ExclusiveCount - (double)x.ExclusiveCount) / (double)y.ExclusiveCount) * (double)100;
+                        data.InclusivePercentDiff = (Math.Abs((double)y.InclusivePercent - (double)x.InclusivePercent) / (double)y.InclusivePercent) * (double)100;
+                        data.InclusiveCountPercentDiff = (Math.Abs((double)y.InclusiveCount - (double)x.InclusiveCount) / (double)y.InclusiveCount) * (double)100;
                         managedCallsDiff.Add(data);
                     }
                 }
@@ -362,10 +362,10 @@ namespace EzJit
                     {
                         var data = new MethodCallDataDiff();
                         data.Name = x.Name;
-                        data.ExclusivePercentDiff = ((y.ExclusivePercent - x.ExclusivePercent) / y.ExclusivePercent) * 100;
-                        data.ExclusiveCountPercentDiff = (((double)y.ExclusiveCount - (double)x.ExclusiveCount) / (double)y.ExclusiveCount) * (double)100;
-                        data.InclusivePercentDiff = (((double)y.InclusivePercent - (double)x.InclusivePercent) / (double)y.InclusivePercent) * (double)100;
-                        data.InclusiveCountPercentDiff = (((double)y.InclusiveCount - (double)x.InclusiveCount) / (double)y.InclusiveCount) * (double)100;
+                        data.ExclusivePercentDiff = (Math.Abs(y.ExclusivePercent - x.ExclusivePercent) / y.ExclusivePercent) * 100;
+                        data.ExclusiveCountPercentDiff = (Math.Abs((double)y.ExclusiveCount - (double)x.ExclusiveCount) / (double)y.ExclusiveCount) * (double)100;
+                        data.InclusivePercentDiff = (Math.Abs((double)y.InclusivePercent - (double)x.InclusivePercent) / (double)y.InclusivePercent) * (double)100;
+                        data.InclusiveCountPercentDiff = (Math.Abs((double)y.InclusiveCount - (double)x.InclusiveCount) / (double)y.InclusiveCount) * (double)100;
                         nativeCallsDiff.Add(data);
                     }
                 }
