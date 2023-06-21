@@ -218,7 +218,7 @@ namespace EzJit
 
             foreach (var jitMethod in jitMethods)
             {
-                grid.AddRow(new string[] { Markup.Escape(jitMethod.FullyQualifiedName), jitMethod.TimePercentDiff.ToString("F04", CultureInfo.InvariantCulture) });
+                grid.AddRow(new string[] { Markup.Escape(jitMethod.FullyQualifiedName), jitMethod.TimeDiff.ToString("F04", CultureInfo.InvariantCulture) });
             }
 
             AnsiConsole.Write(grid);
@@ -326,11 +326,11 @@ namespace EzJit
                         data.FullyQualifiedName = x.FullyQualifiedName;
                         if (settings.UsePercent)
                         {
-                            data.TimePercentDiff = (Math.Abs(y.Time - x.Time) / y.Time) * 100;
+                            data.TimeDiff = (Math.Abs(y.Time - x.Time) / y.Time) * 100;
                         }
                         else
                         {
-                            data.TimePercentDiff = y.Time - x.Time;
+                            data.TimeDiff = y.Time - x.Time;
                         }
                         jitMethodsDiff.Add(data);
                     }
@@ -394,7 +394,7 @@ namespace EzJit
                     }
                 }
 
-                jitMethodsDiff = jitMethodsDiff.OrderByDescending(x => x.TimePercentDiff).Take(EzJit.NumberOfMethodsToPrint).ToList();
+                jitMethodsDiff = jitMethodsDiff.OrderByDescending(x => x.TimeDiff).Take(EzJit.NumberOfMethodsToPrint).ToList();
                 managedCallsDiff = managedCallsDiff.OrderByDescending(x => x.ExclusivePercentDiff).Take(EzJit.NumberOfMethodsToPrint).ToList();
                 nativeCallsDiff = nativeCallsDiff.OrderByDescending(x => x.ExclusivePercentDiff).Take(EzJit.NumberOfMethodsToPrint).ToList();
 

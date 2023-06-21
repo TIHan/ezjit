@@ -43,7 +43,7 @@ namespace EzJit
 
         [Index(1)]
         [Name("timep")]
-        public double TimePercentDiff { get; set; }
+        public double TimeDiff { get; set; }
     }
 
     sealed class MethodCallData
