@@ -32,6 +32,7 @@ namespace EzJit
             }
         }
 
+        public bool IsValid { get { return Time != 0; } }
     }
 
     sealed class JitMethodDataDiff
@@ -40,15 +41,9 @@ namespace EzJit
         [Name("name")]
         public string FullyQualifiedName { get; set; }
 
-        [Ignore]
-        public double StartTime { get; set; }
-
-        [Ignore]
-        public double EndTime { get; set; }
-
         [Index(1)]
-        [Name("time")]
-        public double Time { get; set; }
+        [Name("timep")]
+        public double TimePercentDiff { get; set; }
     }
 
     sealed class MethodCallData
@@ -72,6 +67,31 @@ namespace EzJit
         [Index(4)]
         [Name("inc")]
         public int InclusiveCount { get; set; }
+
+        public bool IsValid { get { return ExclusivePercent != 0 && ExclusiveCount != 0 && InclusiveCount != 0 && InclusivePercent != 0; } }
+    }
+
+    sealed class MethodCallDataDiff
+    {
+        [Index(0)]
+        [Name("name")]
+        public string Name { get; set; }
+
+        [Index(1)]
+        [Name("excpp")]
+        public double ExclusivePercentDiff { get; set; }
+
+        [Index(2)]
+        [Name("excp")]
+        public double ExclusiveCountPercentDiff { get; set; }
+
+        [Index(3)]
+        [Name("incpp")]
+        public double InclusivePercentDiff { get; set; }
+
+        [Index(4)]
+        [Name("incp")]
+        public double InclusiveCountPercentDiff { get; set; }
     }
 
     sealed class TimeStampRange
