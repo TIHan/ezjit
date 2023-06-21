@@ -147,8 +147,6 @@ namespace EzJit
 
         static void PrintTopSlowestJittedMethods(List<JitMethodData> jitMethods)
         {
-            jitMethods = jitMethods.OrderByDescending(x => x.Time).Take(EzJit.NumberOfMethodsToPrint).ToList();
-
             AnsiConsole.MarkupLine("[purple]Top Slowest Jitted Methods[/]");
 
             var grid = new Grid();
@@ -166,8 +164,6 @@ namespace EzJit
 
         static void PrintTopSlowestManagedMethodCalls(List<MethodCallData> methodCalls)
         {
-            methodCalls = methodCalls.OrderByDescending(x => x.ExclusivePercent).Take(EzJit.NumberOfMethodsToPrint).ToList();
-
             AnsiConsole.MarkupLine("[purple]Top Slowest Managed Method Calls[/]");
 
             var grid = new Grid();
@@ -188,8 +184,6 @@ namespace EzJit
 
         static void PrintTopSlowestNativeMethodCalls(List<MethodCallData> methodCalls)
         {
-            methodCalls = methodCalls.OrderByDescending(x => x.ExclusivePercent).Take(EzJit.NumberOfMethodsToPrint).ToList();
-
             AnsiConsole.MarkupLine("[purple]Top Slowest Native Method Calls[/]");
 
             var grid = new Grid();
@@ -210,8 +204,6 @@ namespace EzJit
 
         static void PrintTopSlowestJittedMethodsDiff(List<JitMethodDataDiff> jitMethods)
         {
-            jitMethods = jitMethods.OrderByDescending(x => x.TimePercentDiff).Take(EzJit.NumberOfMethodsToPrint).ToList();
-
             AnsiConsole.MarkupLine("[purple]Top Slowest Jitted Methods - Diffs[/]");
 
             var grid = new Grid();
@@ -229,8 +221,6 @@ namespace EzJit
 
         static void PrintTopSlowestManagedMethodCallsDiff(List<MethodCallDataDiff> methodCalls)
         {
-            methodCalls = methodCalls.OrderByDescending(x => x.ExclusivePercentDiff).Take(EzJit.NumberOfMethodsToPrint).ToList();
-
             AnsiConsole.MarkupLine("[purple]Top Slowest Managed Method Calls - Diffs[/]");
 
             var grid = new Grid();
@@ -251,8 +241,6 @@ namespace EzJit
 
         static void PrintTopSlowestNativeMethodCallsDiff(List<MethodCallDataDiff> methodCalls)
         {
-            methodCalls = methodCalls.OrderByDescending(x => x.ExclusivePercentDiff).Take(EzJit.NumberOfMethodsToPrint).ToList();
-
             AnsiConsole.MarkupLine("[purple]Top Slowest Native Method Calls - Diffs[/]");
 
             var grid = new Grid();
@@ -370,6 +358,10 @@ namespace EzJit
                     }
                 }
 
+                jitMethodsDiff = jitMethodsDiff.OrderByDescending(x => x.TimePercentDiff).Take(EzJit.NumberOfMethodsToPrint).ToList();
+                managedCallsDiff = managedCallsDiff.OrderByDescending(x => x.ExclusivePercentDiff).Take(EzJit.NumberOfMethodsToPrint).ToList();
+                nativeCallsDiff = nativeCallsDiff.OrderByDescending(x => x.ExclusivePercentDiff).Take(EzJit.NumberOfMethodsToPrint).ToList();
+
                 if (string.IsNullOrWhiteSpace(settings.OutputCsvPrefix))
                 {
                     AnsiConsole.WriteLine("");
@@ -439,6 +431,10 @@ namespace EzJit
                 range.StartEventName = settings.StartEventName;
                 range.EndEventName = settings.EndEventName;
                 var (jitMethods, managedCalls, nativeCalls) = EtlProcessing.ProcessEtl(settings.EtlFilePath, settings.CanHideMethodSignature, false, settings.ProcessId, range, string.Empty);
+
+                jitMethods = jitMethods.OrderByDescending(x => x.Time).Take(EzJit.NumberOfMethodsToPrint).ToList();
+                managedCalls = managedCalls.OrderByDescending(x => x.ExclusivePercent).Take(EzJit.NumberOfMethodsToPrint).ToList();
+                nativeCalls = nativeCalls.OrderByDescending(x => x.ExclusivePercent).Take(EzJit.NumberOfMethodsToPrint).ToList();
 
                 if (string.IsNullOrEmpty(settings.OutputCsvPrefix))
                 {
