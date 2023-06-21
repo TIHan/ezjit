@@ -326,7 +326,7 @@ namespace EzJit
                         data.FullyQualifiedName = x.FullyQualifiedName;
                         if (settings.UsePercent)
                         {
-                            data.TimeDiff = (Math.Abs(y.Time - x.Time) / y.Time) * 100;
+                            data.TimeDiff = ((y.Time - x.Time) / y.Time) * 100;
                         }
                         else
                         {
@@ -349,10 +349,10 @@ namespace EzJit
                         data.Name = x.Name;
                         if (settings.UsePercent)
                         {
-                            data.ExclusivePercentDiff = (Math.Abs(y.ExclusivePercent - x.ExclusivePercent) / y.ExclusivePercent) * (double)100;
-                            data.ExclusiveCountDiff = (Math.Abs((double)y.ExclusiveCount - (double)x.ExclusiveCount) / (double)y.ExclusiveCount) * (double)100;
-                            data.InclusivePercentDiff = (Math.Abs(y.InclusivePercent - x.InclusivePercent) / y.InclusivePercent) * (double)100;
-                            data.InclusiveCountDiff = (Math.Abs((double)y.InclusiveCount - (double)x.InclusiveCount) / (double)y.InclusiveCount) * (double)100;
+                            data.ExclusivePercentDiff = ((y.ExclusivePercent - x.ExclusivePercent) / y.ExclusivePercent) * (double)100;
+                            data.ExclusiveCountDiff = (((double)y.ExclusiveCount - (double)x.ExclusiveCount) / (double)y.ExclusiveCount) * (double)100;
+                            data.InclusivePercentDiff = ((y.InclusivePercent - x.InclusivePercent) / y.InclusivePercent) * (double)100;
+                            data.InclusiveCountDiff = (((double)y.InclusiveCount - (double)x.InclusiveCount) / (double)y.InclusiveCount) * (double)100;
                         }
                         else
                         {
@@ -378,10 +378,10 @@ namespace EzJit
                         data.Name = x.Name;
                         if (settings.UsePercent)
                         {
-                            data.ExclusivePercentDiff = (Math.Abs(y.ExclusivePercent - x.ExclusivePercent) / y.ExclusivePercent) * (double)100;
-                            data.ExclusiveCountDiff = (Math.Abs((double)y.ExclusiveCount - (double)x.ExclusiveCount) / (double)y.ExclusiveCount) * (double)100;
-                            data.InclusivePercentDiff = (Math.Abs(y.InclusivePercent - x.InclusivePercent) / y.InclusivePercent) * (double)100;
-                            data.InclusiveCountDiff = (Math.Abs((double)y.InclusiveCount - (double)x.InclusiveCount) / (double)y.InclusiveCount) * (double)100;
+                            data.ExclusivePercentDiff = ((y.ExclusivePercent - x.ExclusivePercent) / y.ExclusivePercent) * (double)100;
+                            data.ExclusiveCountDiff = (((double)y.ExclusiveCount - (double)x.ExclusiveCount) / (double)y.ExclusiveCount) * (double)100;
+                            data.InclusivePercentDiff = ((y.InclusivePercent - x.InclusivePercent) / y.InclusivePercent) * (double)100;
+                            data.InclusiveCountDiff = (((double)y.InclusiveCount - (double)x.InclusiveCount) / (double)y.InclusiveCount) * (double)100;
                         }
                         else
                         {
