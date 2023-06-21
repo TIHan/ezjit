@@ -214,7 +214,7 @@ namespace EzJit
             var grid = new Grid();
             grid.AddColumn();
             grid.AddColumn();
-            grid.AddRow(new string[] { "Name", "Jit Time Diff %" });
+            grid.AddRow(new string[] { "Name", "Jit Time(ms) Diff" });
 
             foreach (var jitMethod in jitMethods)
             {
