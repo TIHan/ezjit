@@ -118,6 +118,11 @@ namespace EzJit
                 if (settings.CanAnalyze)
                 {
                     var (jitMethods, managedCalls, nativeCalls) = EtlProcessing.ProcessEtl(etlFilePath + ".zip", true, true, -1, new TimeStampRange(), Path.Combine(coreRoot, "\\PDB"));
+
+                    jitMethods = jitMethods.OrderByDescending(x => x.Time).Take(EzJit.NumberOfMethodsToPrint).ToList();
+                    managedCalls = managedCalls.OrderByDescending(x => x.ExclusivePercent).Take(EzJit.NumberOfMethodsToPrint).ToList();
+                    nativeCalls = nativeCalls.OrderByDescending(x => x.ExclusivePercent).Take(EzJit.NumberOfMethodsToPrint).ToList();
+
                     AnsiConsole.WriteLine("");
                     PrintTopSlowestJittedMethods(jitMethods);
                     AnsiConsole.WriteLine("");
