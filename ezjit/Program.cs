@@ -117,7 +117,11 @@ namespace EzJit
 
                 if (settings.CanAnalyze)
                 {
-                    var (jitMethods, managedCalls, nativeCalls) = EtlProcessing.ProcessEtl(etlFilePath + ".zip", true, true, -1, new TimeStampRange(), Path.Combine(coreRoot, "\\PDB"));
+                    var result = EtlProcessing.ProcessEtl(etlFilePath + ".zip", true, true, -1, new TimeStampRange(), Path.Combine(coreRoot, "\\PDB"));
+
+                    var jitMethods = result.JitMethods;
+                    var managedCalls = result.ManagedCalls;
+                    var nativeCalls = result.NativeCalls;
 
                     jitMethods = jitMethods.OrderByDescending(x => x.Time).Take(EzJit.NumberOfMethodsToPrint).ToList();
                     managedCalls = managedCalls.OrderByDescending(x => x.ExclusivePercent).Take(EzJit.NumberOfMethodsToPrint).ToList();
@@ -306,8 +310,16 @@ namespace EzJit
                 range.End = settings.End;
                 range.StartEventName = settings.StartEventName;
                 range.EndEventName = settings.EndEventName;
-                var (jitMethods, managedCalls, nativeCalls) = EtlProcessing.ProcessEtl(settings.EtlFilePath, false, false, settings.ProcessId, range, string.Empty);
-                var (jitMethodsBase, managedCallsBase, nativeCallsBase) = EtlProcessing.ProcessEtl(settings.BaseEtlFilePath, false, false, settings.BaseProcessId, range, string.Empty);
+                var result = EtlProcessing.ProcessEtl(settings.EtlFilePath, false, false, settings.ProcessId, range, string.Empty);
+                var resultBase = EtlProcessing.ProcessEtl(settings.BaseEtlFilePath, false, false, settings.BaseProcessId, range, string.Empty);
+
+                var jitMethods = result.JitMethods;
+                var managedCalls = result.ManagedCalls;
+                var nativeCalls = result.NativeCalls;
+
+                var jitMethodsBase = resultBase.JitMethods;
+                var managedCallsBase = resultBase.ManagedCalls;
+                var nativeCallsBase = resultBase.NativeCalls;
 
                 var jitMethodsDiff = new List<JitMethodDataDiff>();
                 var managedCallsDiff = new List<MethodCallDataDiff>();
@@ -462,11 +474,20 @@ namespace EzJit
                 range.End = settings.End;
                 range.StartEventName = settings.StartEventName;
                 range.EndEventName = settings.EndEventName;
-                var (jitMethods, managedCalls, nativeCalls) = EtlProcessing.ProcessEtl(settings.EtlFilePath, false, false, settings.ProcessId, range, string.Empty);
+                var result = EtlProcessing.ProcessEtl(settings.EtlFilePath, false, false, settings.ProcessId, range, string.Empty);
+
+                var jitMethods = result.JitMethods;
+                var managedCalls = result.ManagedCalls;
+                var nativeCalls = result.NativeCalls;
 
                 jitMethods = jitMethods.OrderByDescending(x => x.Time).Take(EzJit.NumberOfMethodsToPrint).ToList();
                 managedCalls = managedCalls.OrderByDescending(x => x.ExclusivePercent).Take(EzJit.NumberOfMethodsToPrint).ToList();
                 nativeCalls = nativeCalls.OrderByDescending(x => x.ExclusivePercent).Take(EzJit.NumberOfMethodsToPrint).ToList();
+
+                AnsiConsole.WriteLine("");
+                AnsiConsole.MarkupLine("[purple]Total GC Time[/]");
+                AnsiConsole.WriteLine(result.TotalGCTime);
+
 
                 if (string.IsNullOrEmpty(settings.OutputCsvPrefix))
                 {

@@ -14,6 +14,32 @@ using System.Collections;
 
 namespace EzJit
 {
+    class EtlProcessingResult
+    {
+        public List<JitMethodData> JitMethods { get; set; }
+
+        public List<MethodCallData> ManagedCalls { get; set; }
+
+        public List<MethodCallData> NativeCalls { get; set; }
+
+        public double TotalGCTime { get; set; }
+    }
+
+    class GCTime
+    {
+        public double Start { get; set; }
+
+        public double End { get; set; }
+
+        public double Time
+        {
+            get
+            {
+                return End - Start;
+            }
+        }
+    }
+
     static class EtlProcessing
     {
         static bool FilterTraceEvent(List<TimeStampRange> timeStampRanges, TraceEvent data)
@@ -26,7 +52,7 @@ namespace EzJit
             return timeStampRanges.Exists((r) => (data.TimeStampRelativeMSec >= r.Start && data.TimeStampRelativeMSec <= r.End));
         }
 
-        static (List<JitMethodData>, List<MethodCallData> managedCalls, List<MethodCallData> nativeCalls) ProcessEtlCore(string etlFilePath, bool canHideMethodSignature, bool isCoreRun, int processId, TimeStampRange timeStampRange, string pdbDir)
+        static EtlProcessingResult ProcessEtlCore(string etlFilePath, bool canHideMethodSignature, bool isCoreRun, int processId, TimeStampRange timeStampRange, string pdbDir)
         {
             HashSet<ModuleFileIndex> moduleSymbolsLoaded = new();
             TextWriter SymbolLookupMessages = new StringWriter();
@@ -104,10 +130,47 @@ namespace EzJit
                 timeStampRanges.Add(timeStampRange);
             }
 
+            if (timeStampRanges.Count > 1)
+            {
+                timeStampRanges.RemoveRange(0, timeStampRanges.Count - 2);
+            }
+
+            var gcs = new Dictionary<int, List<GCTime>>();
             using (var source = new ETWTraceEventSource(etlFilePath))
             {
                 source.Clr.MethodJittingStarted += Clr_MethodJittingStarted;
                 source.Clr.MethodLoadVerbose += Clr_MethodLoadVerbose;
+
+                source.Clr.GCStart += (GCStartTraceData obj) =>
+                {
+                    if (!FilterTraceEvent(timeStampRanges, obj))
+                        return;
+
+                    var gcTime = new GCTime();
+                    gcTime.Start = obj.TimeStampRelativeMSec;
+
+                    if (gcs.TryGetValue(obj.ThreadID, out var list))
+                    {
+                        list.Add(gcTime);
+                    }
+                    else
+                    {
+                        var newList = new List<GCTime>();
+                        newList.Add(gcTime);
+                        gcs.Add(obj.ThreadID, newList);
+                    }
+                };
+
+                source.Clr.GCStop += (GCEndTraceData obj) =>
+                {
+                    if (!FilterTraceEvent(timeStampRanges, obj))
+                        return;
+
+                    if (gcs.TryGetValue(obj.ThreadID, out var list))
+                    {
+                        list[list.Count - 1].End = obj.TimeStampRelativeMSec;
+                    }
+                };
 
                 var traceLog = TraceLog.OpenOrConvert(etlFilePath, new TraceLogOptions() { ConversionLog = Console.Out });
 
@@ -182,7 +245,15 @@ namespace EzJit
             symbolReader.Dispose();
             SymbolLookupMessages.Dispose();
 
-            return (methods.Where(x => x.EndTime != 0 && x.Time >= 0.01).OrderByDescending(x => x.Time).Take(EzJit.NumberOfMethodsToProcess).ToList(), managedCalls, nativeCalls);
+            var result = new EtlProcessingResult();
+            result.JitMethods = methods.Where(x => x.EndTime != 0 && x.Time >= 0.01).OrderByDescending(x => x.Time).Take(EzJit.NumberOfMethodsToProcess).ToList();
+            result.ManagedCalls = managedCalls;
+            result.NativeCalls = nativeCalls;
+
+            result.TotalGCTime =
+                gcs.Select(x => x.Value).Aggregate((x, y) => { x.AddRange(y); return x; }).Where(x => x.End != 0).Sum((x) => x.Time);
+
+            return result;
 
             void Clr_MethodJittingStarted(MethodJittingStartedTraceData data)
             {
@@ -246,7 +317,7 @@ namespace EzJit
             }
         }
 
-        public static (List<JitMethodData>, List<MethodCallData> managedCalls, List<MethodCallData> nativeCalls) ProcessEtl(string etlOrEtlZipFilePath, bool canHideMethodSignature, bool isCoreRun, int processId, TimeStampRange timeStampRange, string pdbDir)
+        public static EtlProcessingResult ProcessEtl(string etlOrEtlZipFilePath, bool canHideMethodSignature, bool isCoreRun, int processId, TimeStampRange timeStampRange, string pdbDir)
         {
             if (Path.GetExtension(etlOrEtlZipFilePath).Equals(".zip", StringComparison.OrdinalIgnoreCase))
             {
