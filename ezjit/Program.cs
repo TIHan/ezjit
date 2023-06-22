@@ -117,7 +117,7 @@ namespace EzJit
 
                 if (settings.CanAnalyze)
                 {
-                    var result = EtlProcessing.ProcessEtl(etlFilePath + ".zip", true, true, -1, new TimeStampRange(), Path.Combine(coreRoot, "\\PDB"));
+                    var result = EtlProcessing.ProcessEtl(etlFilePath + ".zip", true, true, -1, new TimeStampRange(), Path.Combine(coreRoot, "\\PDB"), true);
 
                     var jitMethods = result.JitMethods;
                     var managedCalls = result.ManagedCalls;
@@ -161,11 +161,13 @@ namespace EzJit
             var grid = new Grid();
             grid.AddColumn();
             grid.AddColumn();
-            grid.AddRow(new string[] { "Name", "Jit Time(ms)" });
+            grid.AddColumn();
+            grid.AddColumn();
+            grid.AddRow(new string[] { "Name", "Tier", "Jit Time(ms)", "CodeGen Size" });
 
             foreach (var jitMethod in jitMethods)
             {
-                grid.AddRow(new string[] { Markup.Escape(jitMethod.FullyQualifiedName), jitMethod.Time.ToString("F04", CultureInfo.InvariantCulture) });
+                grid.AddRow(new string[] { Markup.Escape(jitMethod.FullyQualifiedName), jitMethod.Tier, jitMethod.Time.ToString("F04", CultureInfo.InvariantCulture), jitMethod.CodeGenSize.ToString("F04", CultureInfo.InvariantCulture) });
             }
 
             AnsiConsole.Write(grid);
@@ -218,11 +220,31 @@ namespace EzJit
             var grid = new Grid();
             grid.AddColumn();
             grid.AddColumn();
-            grid.AddRow(new string[] { "Name", "Jit Time(ms) Diff" });
+            grid.AddColumn();
+            grid.AddColumn();
+            grid.AddRow(new string[] { "Name", "Tier", "Jit Time(ms) Diff", "CodeGen Size Diff" });
 
             foreach (var jitMethod in jitMethods)
             {
-                grid.AddRow(new string[] { Markup.Escape(jitMethod.FullyQualifiedName), jitMethod.TimeDiff.ToString("F04", CultureInfo.InvariantCulture) });
+                grid.AddRow(new string[] { Markup.Escape(jitMethod.FullyQualifiedName), jitMethod.Tier, jitMethod.TimeDiff.ToString("F04", CultureInfo.InvariantCulture), jitMethod.CodeGenSizeDiff.ToString("F04", CultureInfo.InvariantCulture) });
+            }
+
+            AnsiConsole.Write(grid);
+        }
+
+        static void PrintTopCodeGenSizesDiff(List<JitMethodDataDiff> jitMethods)
+        {
+            AnsiConsole.MarkupLine("[purple]Top Method CodeGen Sizes - Diffs[/]");
+
+            var grid = new Grid();
+            grid.AddColumn();
+            grid.AddColumn();
+            grid.AddColumn();
+            grid.AddRow(new string[] { "Name", "Tier", "CodeGen Size Diff" });
+
+            foreach (var jitMethod in jitMethods)
+            {
+                grid.AddRow(new string[] { Markup.Escape(jitMethod.FullyQualifiedName), jitMethod.Tier, jitMethod.CodeGenSizeDiff.ToString("F04", CultureInfo.InvariantCulture) });
             }
 
             AnsiConsole.Write(grid);
@@ -310,8 +332,8 @@ namespace EzJit
                 range.End = settings.End;
                 range.StartEventName = settings.StartEventName;
                 range.EndEventName = settings.EndEventName;
-                var result = EtlProcessing.ProcessEtl(settings.EtlFilePath, false, false, settings.ProcessId, range, string.Empty);
-                var resultBase = EtlProcessing.ProcessEtl(settings.BaseEtlFilePath, false, false, settings.BaseProcessId, range, string.Empty);
+                var result = EtlProcessing.ProcessEtl(settings.EtlFilePath, false, false, settings.ProcessId, range, string.Empty, settings.AllEvents);
+                var resultBase = EtlProcessing.ProcessEtl(settings.BaseEtlFilePath, false, false, settings.BaseProcessId, range, string.Empty, settings.AllEvents);
 
                 var jitMethods = result.JitMethods;
                 var managedCalls = result.ManagedCalls;
@@ -325,24 +347,27 @@ namespace EzJit
                 var managedCallsDiff = new List<MethodCallDataDiff>();
                 var nativeCallsDiff = new List<MethodCallDataDiff>();
 
-                var jitMethodsLookup = new Dictionary<string, JitMethodData>(StringComparer.OrdinalIgnoreCase);
+                var jitMethodsLookup = new Dictionary<(string, string), JitMethodData>();
                 foreach (var x in jitMethodsBase)
                 {
-                    jitMethodsLookup[x.FullyQualifiedName] = x;
+                    jitMethodsLookup[(x.FullyQualifiedName, x.Tier)] = x;
                 }
                 foreach (var y in jitMethods)
                 {
-                    if (jitMethodsLookup.TryGetValue(y.FullyQualifiedName, out var x) && x.IsValid && y.IsValid)
+                    if (jitMethodsLookup.TryGetValue((y.FullyQualifiedName, y.Tier), out var x) && x.IsValid && y.IsValid)
                     {
                         var data = new JitMethodDataDiff();
                         data.FullyQualifiedName = x.FullyQualifiedName;
+                        data.Tier = x.Tier;
                         if (settings.UsePercent)
                         {
                             data.TimeDiff = ((y.Time - x.Time) / y.Time) * 100;
+                            data.CodeGenSizeDiff = ((y.CodeGenSize - x.CodeGenSize) / y.CodeGenSize) * 100;
                         }
                         else
                         {
                             data.TimeDiff = y.Time - x.Time;
+                            data.CodeGenSizeDiff = y.CodeGenSize - x.CodeGenSize;
                         }
                         jitMethodsDiff.Add(data);
                     }
@@ -410,8 +435,21 @@ namespace EzJit
                 managedCallsDiff = managedCallsDiff.OrderByDescending(x => x.ExclusivePercentDiff).Take(EzJit.NumberOfMethodsToPrint).ToList();
                 nativeCallsDiff = nativeCallsDiff.OrderByDescending(x => x.ExclusivePercentDiff).Take(EzJit.NumberOfMethodsToPrint).ToList();
 
+                var jitMethodCodeGenSizesDiff = jitMethodsDiff.OrderByDescending(x => x.CodeGenSizeDiff).Take(EzJit.NumberOfMethodsToPrint).ToList();
+
+                AnsiConsole.WriteLine("");
+                AnsiConsole.MarkupLine("[purple]Total GC Time - Diffs[/]");
+                var totalGCTimeDiff = result.TotalGCTime - resultBase.TotalGCTime;
+                if (settings.UsePercent)
+                {
+                    totalGCTimeDiff = totalGCTimeDiff / resultBase.TotalGCTime * (double)100;
+                }
+                AnsiConsole.WriteLine(totalGCTimeDiff.ToString("F04", CultureInfo.InvariantCulture) + "ms");
+
                 if (string.IsNullOrWhiteSpace(settings.OutputCsvPrefix))
                 {
+                    AnsiConsole.WriteLine("");
+                    PrintTopCodeGenSizesDiff(jitMethodCodeGenSizesDiff);
                     AnsiConsole.WriteLine("");
                     PrintTopSlowestJittedMethodsDiff(jitMethodsDiff);
                     AnsiConsole.WriteLine("");
@@ -460,6 +498,10 @@ namespace EzJit
                 [CommandOption("--output-csv-prefix")]
                 [Description("Output analysis data with the given prefix for the output path of each CSV file. The directory the files are created in is the one EzJit was from run.")]
                 public string OutputCsvPrefix { get; set; }
+
+                [CommandOption("--all-events")]
+                [Description("Will perform no filtering of events.")]
+                public bool AllEvents { get; set; }
             }
 
             public override ValidationResult Validate(CommandContext context, Settings settings)
@@ -474,7 +516,7 @@ namespace EzJit
                 range.End = settings.End;
                 range.StartEventName = settings.StartEventName;
                 range.EndEventName = settings.EndEventName;
-                var result = EtlProcessing.ProcessEtl(settings.EtlFilePath, false, false, settings.ProcessId, range, string.Empty);
+                var result = EtlProcessing.ProcessEtl(settings.EtlFilePath, false, false, settings.ProcessId, range, string.Empty, settings.AllEvents);
 
                 var jitMethods = result.JitMethods;
                 var managedCalls = result.ManagedCalls;
@@ -486,8 +528,7 @@ namespace EzJit
 
                 AnsiConsole.WriteLine("");
                 AnsiConsole.MarkupLine("[purple]Total GC Time[/]");
-                AnsiConsole.WriteLine(result.TotalGCTime);
-
+                AnsiConsole.WriteLine(result.TotalGCTime.ToString("F04", CultureInfo.InvariantCulture) + "ms");
 
                 if (string.IsNullOrEmpty(settings.OutputCsvPrefix))
                 {

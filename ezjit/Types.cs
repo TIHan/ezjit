@@ -32,6 +32,15 @@ namespace EzJit
             }
         }
 
+        [Index(2)]
+        [Name("codegen-size")]
+        public double CodeGenSize { get; set; }
+
+        [Index(3)]
+        [Name("tier")]
+        public string Tier { get; set; }
+
+        [Ignore]
         public bool IsValid { get { return Time != 0; } }
     }
 
@@ -42,8 +51,16 @@ namespace EzJit
         public string FullyQualifiedName { get; set; }
 
         [Index(1)]
-        [Name("timep")]
+        [Name("time")]
         public double TimeDiff { get; set; }
+
+        [Index(2)]
+        [Name("codegen-size")]
+        public double CodeGenSizeDiff { get; set; }
+
+        [Index(3)]
+        [Name("tier")]
+        public string Tier { get; set; }
     }
 
     sealed class MethodCallData
@@ -68,6 +85,7 @@ namespace EzJit
         [Name("inc")]
         public int InclusiveCount { get; set; }
 
+        [Ignore]
         public bool IsValid { get { return ExclusivePercent != 0 && ExclusiveCount != 0 && InclusiveCount != 0 && InclusivePercent != 0; } }
     }
 
@@ -78,19 +96,19 @@ namespace EzJit
         public string Name { get; set; }
 
         [Index(1)]
-        [Name("excpp")]
+        [Name("excp")]
         public double ExclusivePercentDiff { get; set; }
 
         [Index(2)]
-        [Name("excp")]
+        [Name("exc")]
         public double ExclusiveCountDiff { get; set; }
 
         [Index(3)]
-        [Name("incpp")]
+        [Name("incp")]
         public double InclusivePercentDiff { get; set; }
 
         [Index(4)]
-        [Name("incp")]
+        [Name("inc")]
         public double InclusiveCountDiff { get; set; }
     }
 

@@ -52,7 +52,7 @@ namespace EzJit
             return timeStampRanges.Exists((r) => (data.TimeStampRelativeMSec >= r.Start && data.TimeStampRelativeMSec <= r.End));
         }
 
-        static EtlProcessingResult ProcessEtlCore(string etlFilePath, bool canHideMethodSignature, bool isCoreRun, int processId, TimeStampRange timeStampRange, string pdbDir)
+        static EtlProcessingResult ProcessEtlCore(string etlFilePath, bool canHideMethodSignature, bool isCoreRun, int processId, TimeStampRange timeStampRange, string pdbDir, bool useAllEvents)
         {
             HashSet<ModuleFileIndex> moduleSymbolsLoaded = new();
             TextWriter SymbolLookupMessages = new StringWriter();
@@ -130,7 +130,11 @@ namespace EzJit
                 timeStampRanges.Add(timeStampRange);
             }
 
-            if (timeStampRanges.Count > 1)
+            if (useAllEvents)
+            {
+                timeStampRanges.Clear();
+            }
+            else if (timeStampRanges.Count > 1)
             {
                 timeStampRanges.RemoveRange(0, timeStampRanges.Count - 2);
             }
@@ -291,6 +295,8 @@ namespace EzJit
                 if (methodLookup.TryGetValue(data.MethodID, out m))
                 {
                     m.EndTime = data.TimeStampRelativeMSec;
+                    m.CodeGenSize = data.MethodSize;
+                    m.Tier = data.OptimizationTier.ToString();
                 }
             }
         }
@@ -317,7 +323,7 @@ namespace EzJit
             }
         }
 
-        public static EtlProcessingResult ProcessEtl(string etlOrEtlZipFilePath, bool canHideMethodSignature, bool isCoreRun, int processId, TimeStampRange timeStampRange, string pdbDir)
+        public static EtlProcessingResult ProcessEtl(string etlOrEtlZipFilePath, bool canHideMethodSignature, bool isCoreRun, int processId, TimeStampRange timeStampRange, string pdbDir, bool useAllEvents)
         {
             if (Path.GetExtension(etlOrEtlZipFilePath).Equals(".zip", StringComparison.OrdinalIgnoreCase))
             {
@@ -327,7 +333,7 @@ namespace EzJit
 
                 try
                 {
-                    return ProcessEtlCore(nonZipEtlPath, canHideMethodSignature, isCoreRun, processId, timeStampRange, pdbDir);
+                    return ProcessEtlCore(nonZipEtlPath, canHideMethodSignature, isCoreRun, processId, timeStampRange, pdbDir, useAllEvents);
                 }
                 finally
                 {
@@ -340,7 +346,7 @@ namespace EzJit
             }
 
             var etlPath = Path.GetFullPath(etlOrEtlZipFilePath);
-            return ProcessEtlCore(etlPath, canHideMethodSignature, isCoreRun, processId, timeStampRange, pdbDir);
+            return ProcessEtlCore(etlPath, canHideMethodSignature, isCoreRun, processId, timeStampRange, pdbDir, useAllEvents);
         }
     }
 }
