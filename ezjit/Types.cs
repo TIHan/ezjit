@@ -110,6 +110,10 @@ namespace EzJit
         [Index(4)]
         [Name("inc")]
         public double InclusiveCountDiff { get; set; }
+
+        [Index(5)]
+        [Name("time-spent")]
+        public double TimeSpent { get; set; }
     }
 
     sealed class TimeStampRange

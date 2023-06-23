@@ -22,7 +22,11 @@ namespace EzJit
 
         public List<MethodCallData> NativeCalls { get; set; }
 
+        public List<MethodCallData> AllCalls { get; set; }
+
         public double TotalGCTime { get; set; }
+
+        public double Duration { get; set; }
     }
 
     class GCTime
@@ -52,6 +56,34 @@ namespace EzJit
             return timeStampRanges.Exists((r) => (data.TimeStampRelativeMSec >= r.Start && data.TimeStampRelativeMSec <= r.End));
         }
 
+        static List<MethodCallData> GetMethodCalls(TraceProcess p, List<TimeStampRange> timeStampRanges, Func<TraceCallStack, bool> filter)
+        {
+            var calls = new List<MethodCallData>();
+            var evts = p.EventsInProcess.Filter(x =>
+            {
+                if (!FilterTraceEvent(timeStampRanges, x))
+                    return false;
+
+                var callStack = x.CallStack();
+                if (callStack != null)
+                {
+                    return filter(callStack);
+                }
+                return false;
+            });
+
+            var callTree = new CallTree(ScalingPolicyKind.TimeMetric);
+            var stackSource = new TraceEventStackSource(evts);
+            callTree.StackSource = stackSource;
+
+            foreach (var call in callTree.ByIDSortedExclusiveMetric().Take(EzJit.NumberOfMethodsToProcess).Where(x => x.ExclusiveMetricPercent >= 0.01))
+            {
+                calls.Add(new MethodCallData() { Name = name, ExclusivePercent = call.ExclusiveMetricPercent, ExclusiveCount = (int)call.ExclusiveCount, InclusivePercent = call.InclusiveMetricPercent, InclusiveCount = (int)call.InclusiveCount });
+            }
+
+            return calls;
+        }
+
         static EtlProcessingResult ProcessEtlCore(string etlFilePath, bool canHideMethodSignature, bool isCoreRun, int processId, TimeStampRange timeStampRange, string pdbDir, bool useAllEvents)
         {
             HashSet<ModuleFileIndex> moduleSymbolsLoaded = new();
@@ -67,10 +99,6 @@ namespace EzJit
 
             var methods = new List<JitMethodData>();
             var methodLookup = new Dictionary<long, JitMethodData>();
-
-            var managedCalls = new List<MethodCallData>();
-            var nativeCalls = new List<MethodCallData>();
-
             var timeStampRanges = new List<TimeStampRange>();
 
             // Pre-process to get time-stamps for the first occurence of the start and/or end events.
@@ -136,7 +164,7 @@ namespace EzJit
             }
             else if (timeStampRanges.Count > 1)
             {
-                timeStampRanges.RemoveRange(0, timeStampRanges.Count - 2);
+                timeStampRanges.RemoveRange(0, timeStampRanges.Count - 1);
             }
 
             var gcs = new Dictionary<int, List<GCTime>>();
@@ -176,75 +204,54 @@ namespace EzJit
                     }
                 };
 
-                var traceLog = TraceLog.OpenOrConvert(etlFilePath, new TraceLogOptions() { ConversionLog = Console.Out });
-
-                TraceProcess p;
-                if (isCoreRun)
-                {
-                    p = traceLog.Processes.First(x => x.CommandLine.Contains("corerun"));
-                }
-                else
-                {
-                    p = traceLog.Processes.FirstOrDefault(x => x.ProcessID == processId);
-                }
-
-                var evts = p.EventsInProcess.Filter(x =>
-                {
-                    if (!FilterTraceEvent(timeStampRanges, x))
-                        return false;
-
-                    var callStack = x.CallStack();
-                    if (callStack != null)
-                    {
-                        var mname = callStack.CodeAddress.ModuleName;
-                        if (mname.Contains(".") || mname.StartsWith("ManagedModule"))
-                        {
-                            return true;
-                        }
-                    }
-                    return false;
-                });
-
-                var callTree = new CallTree(ScalingPolicyKind.TimeMetric);
-                var stackSource = new TraceEventStackSource(evts);
-                callTree.StackSource = stackSource;
-
-                foreach (var call in callTree.ByIDSortedExclusiveMetric().Take(EzJit.NumberOfMethodsToProcess).Where(x => x.ExclusiveMetricPercent >= 0.1))
-                {
-                    managedCalls.Add(new MethodCallData() { Name = call.Name, ExclusivePercent = call.ExclusiveMetricPercent, ExclusiveCount = (int)call.ExclusiveCount, InclusivePercent = call.InclusiveMetricPercent, InclusiveCount = (int)call.InclusiveCount });
-                }
-
-                var evts2 = p.EventsInProcess.Filter(x =>
-                {
-                    if (!FilterTraceEvent(timeStampRanges, x))
-                        return false;
-
-                    var callStack = x.CallStack();
-                    if (callStack != null)
-                    {
-                        var mname = callStack.CodeAddress.ModuleName;
-                        if (!mname.Contains(".") && !mname.StartsWith("ManagedModule"))
-                        {
-                            ResolveNativeCode(moduleSymbolsLoaded, callStack, symbolReader);
-                            return true;
-                        }
-                    }
-                    return false;
-                });
-
-                var callTree2 = new CallTree(ScalingPolicyKind.TimeMetric);
-                var stackSource2 = new TraceEventStackSource(evts2);
-                callTree2.StackSource = stackSource2;
-
-                foreach (var call in callTree2.ByIDSortedExclusiveMetric().Take(EzJit.NumberOfMethodsToProcess).Where(x => x.ExclusiveMetricPercent >= 0.1))
-                {
-                    nativeCalls.Add(new MethodCallData() { Name = call.Name, ExclusivePercent = call.ExclusiveMetricPercent, ExclusiveCount = (int)call.ExclusiveCount, InclusivePercent = call.InclusiveMetricPercent, InclusiveCount = (int)call.InclusiveCount });
-                }
-
-                traceLog.Dispose();
-
                 source.Process();
             }
+
+            var traceLog = TraceLog.OpenOrConvert(etlFilePath, new TraceLogOptions() { ConversionLog = Console.Out });
+
+            TraceProcess p;
+            if (isCoreRun)
+            {
+                p = traceLog.Processes.First(x => x.CommandLine.Contains("corerun"));
+            }
+            else
+            {
+                p = traceLog.Processes.FirstOrDefault(x => x.ProcessID == processId);
+            }
+
+            var managedCalls = GetMethodCalls(p, timeStampRanges, callStack =>
+            {
+                var mname = callStack.CodeAddress.ModuleName;
+                if (mname.Contains(".") || mname.StartsWith("ManagedModule"))
+                {
+                    return true;
+                }
+                return false;
+            });
+
+            var nativeCalls = GetMethodCalls(p, timeStampRanges, callStack =>
+            {
+                var mname = callStack.CodeAddress.ModuleName;
+                if (!mname.Contains(".") && !mname.StartsWith("ManagedModule"))
+                {
+                    ResolveNativeCode(moduleSymbolsLoaded, callStack, symbolReader);
+                    return true;
+                }
+                return false;
+            });
+
+            var allCalls = GetMethodCalls(p, timeStampRanges, callStack =>
+            {
+                var mname = callStack.CodeAddress.ModuleName;
+                if (!mname.Contains(".") && !mname.StartsWith("ManagedModule"))
+                {
+                    ResolveNativeCode(moduleSymbolsLoaded, callStack, symbolReader);
+                }
+                return true;
+            });
+
+            traceLog.Dispose();
+
 
             symbolReader.Dispose();
             SymbolLookupMessages.Dispose();
@@ -253,9 +260,19 @@ namespace EzJit
             result.JitMethods = methods.Where(x => x.EndTime != 0 && x.Time >= 0.01).OrderByDescending(x => x.Time).Take(EzJit.NumberOfMethodsToProcess).ToList();
             result.ManagedCalls = managedCalls;
             result.NativeCalls = nativeCalls;
+            result.AllCalls = allCalls;
 
             result.TotalGCTime =
                 gcs.Select(x => x.Value).Aggregate((x, y) => { x.AddRange(y); return x; }).Where(x => x.End != 0).Sum((x) => x.Time);
+
+            if (timeStampRanges.Count == 1)
+            {
+                result.Duration = timeStampRanges[0].End - timeStampRanges[0].Start;
+            }
+            else
+            {
+                result.Duration = 0;
+            }
 
             return result;
 
