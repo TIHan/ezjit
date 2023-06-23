@@ -78,7 +78,7 @@ namespace EzJit
 
             foreach (var call in callTree.ByIDSortedExclusiveMetric().Take(EzJit.NumberOfMethodsToProcess).Where(x => x.ExclusiveMetricPercent >= 0.01))
             {
-                calls.Add(new MethodCallData() { Name = name, ExclusivePercent = call.ExclusiveMetricPercent, ExclusiveCount = (int)call.ExclusiveCount, InclusivePercent = call.InclusiveMetricPercent, InclusiveCount = (int)call.InclusiveCount });
+                calls.Add(new MethodCallData() { Name = call.Name, ExclusivePercent = call.ExclusiveMetricPercent, ExclusiveCount = (int)call.ExclusiveCount, InclusivePercent = call.InclusiveMetricPercent, InclusiveCount = (int)call.InclusiveCount });
             }
 
             return calls;
