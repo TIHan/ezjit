@@ -351,7 +351,7 @@ namespace EzJit
             return validate(context, settings);
         }
 
-        public static List<MethodCallDataDiff> DiffMethodCalls(List<MethodCallData> calls, List<MethodCallData> callsBase, double duration, double durationBase, bool usePercent)
+        public static List<MethodCallDataDiff> DiffMethodCalls(List<MethodCallData> calls, List<MethodCallData> callsBase, double duration, double durationBase)
         {
             var callsDiff = new List<MethodCallDataDiff>();
 
@@ -367,20 +367,21 @@ namespace EzJit
                     var data = new MethodCallDataDiff();
                     data.Name = x.Name;
                     data.TimeSpent = (y.ExclusivePercent * (duration / 100)) - (x.ExclusivePercent * (durationBase / 100));
-                    if (usePercent)
-                    {
-                        data.ExclusivePercentDiff = ((y.ExclusivePercent - x.ExclusivePercent) / y.ExclusivePercent) * (double)100;
-                        data.ExclusiveCountDiff = (((double)y.ExclusiveCount - (double)x.ExclusiveCount) / (double)y.ExclusiveCount) * (double)100;
-                        data.InclusivePercentDiff = ((y.InclusivePercent - x.InclusivePercent) / y.InclusivePercent) * (double)100;
-                        data.InclusiveCountDiff = (((double)y.InclusiveCount - (double)x.InclusiveCount) / (double)y.InclusiveCount) * (double)100;
-                    }
-                    else
-                    {
-                        data.ExclusivePercentDiff = y.ExclusivePercent - x.ExclusivePercent;
-                        data.ExclusiveCountDiff = y.ExclusiveCount - x.ExclusiveCount;
-                        data.InclusivePercentDiff = y.InclusivePercent - x.InclusivePercent;
-                        data.InclusiveCountDiff = y.InclusiveCount - x.InclusiveCount;
-                    }
+                    data.ExclusivePercentDiff = y.ExclusivePercent - x.ExclusivePercent;
+                    data.ExclusiveCountDiff = y.ExclusiveCount - x.ExclusiveCount;
+                    data.InclusivePercentDiff = y.InclusivePercent - x.InclusivePercent;
+                    data.InclusiveCountDiff = y.InclusiveCount - x.InclusiveCount;
+                    callsDiff.Add(data);
+                }
+                else
+                {
+                    var data = new MethodCallDataDiff();
+                    data.Name = y.Name + " (NOT FOUND IN BASE)";
+                    data.TimeSpent = (y.ExclusivePercent * (duration / 100));
+                    data.ExclusivePercentDiff = y.ExclusivePercent;
+                    data.ExclusiveCountDiff = y.ExclusiveCount;
+                    data.InclusivePercentDiff = y.InclusivePercent;
+                    data.InclusiveCountDiff = y.InclusiveCount;
                     callsDiff.Add(data);
                 }
             }
@@ -397,10 +398,6 @@ namespace EzJit
 
                 [CommandArgument(3, "<base-process-id>")]
                 public int BaseProcessId { get; set; }
-
-                [CommandOption("--percent")]
-                [Description("Calculate diffs by percentage difference.")]
-                public bool UsePercent { get; set; }
             }
 
             public override ValidationResult Validate(CommandContext context, Settings settings)
@@ -442,27 +439,24 @@ namespace EzJit
                         var data = new JitMethodDataDiff();
                         data.FullyQualifiedName = x.FullyQualifiedName;
                         data.Tier = x.Tier;
-                        if (settings.UsePercent)
-                        {
-                            data.TimeDiff = ((y.Time - x.Time) / y.Time) * 100;
-                            data.CodeGenSizeDiff = ((y.CodeGenSize - x.CodeGenSize) / y.CodeGenSize) * 100;
-                        }
-                        else
-                        {
-                            data.TimeDiff = y.Time - x.Time;
-                            data.CodeGenSizeDiff = y.CodeGenSize - x.CodeGenSize;
-                        }
+                        data.TimeDiff = y.Time - x.Time;
+                        data.CodeGenSizeDiff = y.CodeGenSize - x.CodeGenSize;
                         jitMethodsDiff.Add(data);
                     }
                 }
 
-                var managedCallsDiff = DiffMethodCalls(managedCalls, managedCallsBase, 0, 0, settings.UsePercent);
-                var nativeCallsDiff = DiffMethodCalls(nativeCalls, nativeCallsBase, 0, 0, settings.UsePercent);
-                var allCallsDiff = DiffMethodCalls(allCalls, allCallsBase, result.Duration, resultBase.Duration, settings.UsePercent);
+                var managedCallsDiff = DiffMethodCalls(managedCalls, managedCallsBase, 0, 0);
+                var nativeCallsDiff = DiffMethodCalls(nativeCalls, nativeCallsBase, 0, 0);
+                var allCallsDiff = DiffMethodCalls(allCalls, allCallsBase, result.Duration, resultBase.Duration);
 
                 jitMethodsDiff = jitMethodsDiff.OrderByDescending(x => x.TimeDiff).Take(EzJit.NumberOfMethodsToPrint).ToList();
                 managedCallsDiff = managedCallsDiff.OrderByDescending(x => x.ExclusivePercentDiff).Take(EzJit.NumberOfMethodsToPrint).ToList();
                 nativeCallsDiff = nativeCallsDiff.OrderByDescending(x => x.ExclusivePercentDiff).Take(EzJit.NumberOfMethodsToPrint).ToList();
+
+                var sumTimeSpent = allCallsDiff.Sum(x => {
+                    return x.TimeSpent;
+                });
+
                 allCallsDiff = allCallsDiff.OrderByDescending(x => x.ExclusivePercentDiff).Take(EzJit.NumberOfMethodsToPrint).ToList();
 
                 var jitMethodCodeGenSizesDiff = jitMethodsDiff.OrderByDescending(x => x.CodeGenSizeDiff).Take(EzJit.NumberOfMethodsToPrint).ToList();
@@ -478,20 +472,16 @@ namespace EzJit
                     AnsiConsole.WriteLine("");
                     AnsiConsole.MarkupLine("[purple]Duration - Diffs[/]");
                     var durationDiff = result.Duration - resultBase.Duration;
-                    if (settings.UsePercent)
-                    {
-                        durationDiff = durationDiff / resultBase.Duration * (double)100;
-                    }
                     AnsiConsole.WriteLine(durationDiff.ToString("F04", CultureInfo.InvariantCulture) + "ms");
+
+                    AnsiConsole.WriteLine("");
+                    AnsiConsole.MarkupLine("[purple]Total Time Spent from Diffs[/]");
+                    AnsiConsole.WriteLine(sumTimeSpent.ToString("F04", CultureInfo.InvariantCulture) + "ms");
                 }
 
                 AnsiConsole.WriteLine("");
                 AnsiConsole.MarkupLine("[purple]Total GC Time - Diffs[/]");
                 var totalGCTimeDiff = result.TotalGCTime - resultBase.TotalGCTime;
-                if (settings.UsePercent)
-                {
-                    totalGCTimeDiff = totalGCTimeDiff / resultBase.TotalGCTime * (double)100;
-                }
                 AnsiConsole.WriteLine(totalGCTimeDiff.ToString("F04", CultureInfo.InvariantCulture) + "ms");
 
                 if (string.IsNullOrWhiteSpace(settings.OutputCsvPrefix))
