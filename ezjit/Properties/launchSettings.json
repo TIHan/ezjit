@@ -2,7 +2,7 @@
   "profiles": {
     "ezjit": {
       "commandName": "Project",
-      "commandLineArgs": "corerun C:\\work\\runtime\\artifacts\\bin\\coreclr\\windows.x64.Release\\ --disasm-meth * C:\\work\\ezjit\\ezjit\\bin\\Debug\\net7.0\\ezjit.dll"
+      "commandLineArgs": "analyze-etl c:\\work\\ConcurrentDictionary_TryGetValue_arm64.etl 22496"
     }
   }
 }

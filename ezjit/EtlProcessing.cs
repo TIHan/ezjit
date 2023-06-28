@@ -101,6 +101,8 @@ namespace EzJit
             var methodLookup = new Dictionary<long, JitMethodData>();
             var timeStampRanges = new List<TimeStampRange>();
 
+            var totalOperations = 1;
+
             // Pre-process to get time-stamps for the first occurence of the start and/or end events.
             if (!string.IsNullOrWhiteSpace(timeStampRange.StartEventName) || !string.IsNullOrWhiteSpace(timeStampRange.EndEventName))
             {
@@ -143,6 +145,7 @@ namespace EzJit
                                     {
                                         var bdnTimeStampRange = timeStampRanges[timeStampRanges.Count - 1];
                                         bdnTimeStampRange.End = obj.TimeStampRelativeMSec;
+                                        totalOperations = (int)(long)obj.PayloadByName("totalOperations");
                                     }
                                     break;
 
@@ -262,12 +265,20 @@ namespace EzJit
             result.NativeCalls = nativeCalls;
             result.AllCalls = allCalls;
 
-            result.TotalGCTime =
-                gcs.Select(x => x.Value).Aggregate((x, y) => { x.AddRange(y); return x; }).Where(x => x.End != 0).Sum((x) => x.Time);
+            var gcTimeGroups = gcs.Select(x => x.Value).ToList();
+
+            if (gcTimeGroups.Count > 0)
+            {
+                var gcTimes = gcTimeGroups.Aggregate((x, y) => { x.AddRange(y); return x; }).Where(x => x.End != 0).ToList();
+                if (gcTimes.Count > 0)
+                {
+                    result.TotalGCTime = gcTimes.Sum((x) => x.Time);
+                }
+            }
 
             if (timeStampRanges.Count == 1)
             {
-                result.Duration = timeStampRanges[0].End - timeStampRanges[0].Start;
+                result.Duration = (timeStampRanges[0].End - timeStampRanges[0].Start) / totalOperations;
             }
             else
             {

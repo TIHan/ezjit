@@ -171,7 +171,7 @@ namespace EzJit
 
             foreach (var jitMethod in jitMethods)
             {
-                grid.AddRow(new string[] { Markup.Escape(jitMethod.FullyQualifiedName), jitMethod.Tier, jitMethod.Time.ToString("F04", CultureInfo.InvariantCulture), jitMethod.CodeGenSize.ToString("F04", CultureInfo.InvariantCulture) });
+                grid.AddRow(new string[] { Markup.Escape(jitMethod.FullyQualifiedName), jitMethod.Tier, jitMethod.Time.ToString("F02", CultureInfo.InvariantCulture), jitMethod.CodeGenSize.ToString("F02", CultureInfo.InvariantCulture) });
             }
 
             AnsiConsole.Write(grid);
@@ -191,7 +191,7 @@ namespace EzJit
 
             foreach (var call in methodCalls)
             {
-                grid.AddRow(new string[] { Markup.Escape(call.Name), call.ExclusivePercent.ToString("F04", CultureInfo.InvariantCulture), call.ExclusiveCount.ToString(), call.InclusivePercent.ToString("F04", CultureInfo.InvariantCulture), call.InclusiveCount.ToString() });
+                grid.AddRow(new string[] { Markup.Escape(call.Name), call.ExclusivePercent.ToString("F02", CultureInfo.InvariantCulture), call.ExclusiveCount.ToString(), call.InclusivePercent.ToString("F02", CultureInfo.InvariantCulture), call.InclusiveCount.ToString() });
             }
 
             AnsiConsole.Write(grid);
@@ -211,7 +211,7 @@ namespace EzJit
 
             foreach (var call in methodCalls)
             {
-                grid.AddRow(new string[] { Markup.Escape(call.Name), call.ExclusivePercent.ToString("F04", CultureInfo.InvariantCulture), call.ExclusiveCount.ToString(), call.InclusivePercent.ToString("F04", CultureInfo.InvariantCulture), call.InclusiveCount.ToString() });
+                grid.AddRow(new string[] { Markup.Escape(call.Name), call.ExclusivePercent.ToString("F02", CultureInfo.InvariantCulture), call.ExclusiveCount.ToString(), call.InclusivePercent.ToString("F02", CultureInfo.InvariantCulture), call.InclusiveCount.ToString() });
             }
 
             AnsiConsole.Write(grid);
@@ -232,7 +232,7 @@ namespace EzJit
 
             foreach (var call in methodCalls)
             {
-                grid.AddRow(new string[] { Markup.Escape(call.Name), call.ExclusivePercent.ToString("F04", CultureInfo.InvariantCulture), call.ExclusiveCount.ToString(), call.InclusivePercent.ToString("F04", CultureInfo.InvariantCulture), call.InclusiveCount.ToString(), (call.ExclusivePercent * (duration / 100)).ToString("F04", CultureInfo.InvariantCulture) });
+                grid.AddRow(new string[] { Markup.Escape(call.Name), call.ExclusivePercent.ToString("F02", CultureInfo.InvariantCulture), call.ExclusiveCount.ToString(), call.InclusivePercent.ToString("F02", CultureInfo.InvariantCulture), call.InclusiveCount.ToString(), (call.ExclusivePercent * (duration / 100)).ToString("F02", CultureInfo.InvariantCulture) });
             }
 
             AnsiConsole.Write(grid);
@@ -251,7 +251,7 @@ namespace EzJit
 
             foreach (var jitMethod in jitMethods)
             {
-                grid.AddRow(new string[] { Markup.Escape(jitMethod.FullyQualifiedName), jitMethod.Tier, jitMethod.TimeDiff.ToString("F04", CultureInfo.InvariantCulture), jitMethod.CodeGenSizeDiff.ToString("F04", CultureInfo.InvariantCulture) });
+                grid.AddRow(new string[] { Markup.Escape(jitMethod.FullyQualifiedName), jitMethod.Tier, jitMethod.TimeDiff.ToString("F02", CultureInfo.InvariantCulture), jitMethod.CodeGenSizeDiff.ToString("F02", CultureInfo.InvariantCulture) });
             }
 
             AnsiConsole.Write(grid);
@@ -269,7 +269,7 @@ namespace EzJit
 
             foreach (var jitMethod in jitMethods)
             {
-                grid.AddRow(new string[] { Markup.Escape(jitMethod.FullyQualifiedName), jitMethod.Tier, jitMethod.CodeGenSizeDiff.ToString("F04", CultureInfo.InvariantCulture) });
+                grid.AddRow(new string[] { Markup.Escape(jitMethod.FullyQualifiedName), jitMethod.Tier, jitMethod.CodeGenSizeDiff.ToString("F02", CultureInfo.InvariantCulture) });
             }
 
             AnsiConsole.Write(grid);
@@ -289,7 +289,7 @@ namespace EzJit
 
             foreach (var call in methodCalls)
             {
-                grid.AddRow(new string[] { Markup.Escape(call.Name), call.ExclusivePercentDiff.ToString("F04", CultureInfo.InvariantCulture), call.ExclusiveCountDiff.ToString("F04", CultureInfo.InvariantCulture), call.InclusivePercentDiff.ToString("F04", CultureInfo.InvariantCulture), call.InclusiveCountDiff.ToString("F04", CultureInfo.InvariantCulture) });
+                grid.AddRow(new string[] { Markup.Escape(call.Name), call.ExclusivePercentDiff.ToString("F02", CultureInfo.InvariantCulture), call.ExclusiveCountDiff.ToString("F02", CultureInfo.InvariantCulture), call.InclusivePercentDiff.ToString("F02", CultureInfo.InvariantCulture), call.InclusiveCountDiff.ToString("F02", CultureInfo.InvariantCulture) });
             }
 
             AnsiConsole.Write(grid);
@@ -309,7 +309,7 @@ namespace EzJit
 
             foreach (var call in methodCalls)
             {
-                grid.AddRow(new string[] { Markup.Escape(call.Name), call.ExclusivePercentDiff.ToString("F04", CultureInfo.InvariantCulture), call.ExclusiveCountDiff.ToString("F04", CultureInfo.InvariantCulture), call.InclusivePercentDiff.ToString("F04", CultureInfo.InvariantCulture), call.InclusiveCountDiff.ToString("F04", CultureInfo.InvariantCulture) });
+                grid.AddRow(new string[] { Markup.Escape(call.Name), call.ExclusivePercentDiff.ToString("F02", CultureInfo.InvariantCulture), call.ExclusiveCountDiff.ToString("F02", CultureInfo.InvariantCulture), call.InclusivePercentDiff.ToString("F02", CultureInfo.InvariantCulture), call.InclusiveCountDiff.ToString("F02", CultureInfo.InvariantCulture) });
             }
 
             AnsiConsole.Write(grid);
@@ -330,7 +330,7 @@ namespace EzJit
 
             foreach (var call in methodCalls)
             {
-                grid.AddRow(new string[] { Markup.Escape(call.Name), call.ExclusivePercentDiff.ToString("F04", CultureInfo.InvariantCulture), call.ExclusiveCountDiff.ToString("F04", CultureInfo.InvariantCulture), call.InclusivePercentDiff.ToString("F04", CultureInfo.InvariantCulture), call.InclusiveCountDiff.ToString("F04", CultureInfo.InvariantCulture), call.TimeSpent.ToString("F04", CultureInfo.InvariantCulture) });
+                grid.AddRow(new string[] { Markup.Escape(call.Name), call.ExclusivePercentDiff.ToString("F02", CultureInfo.InvariantCulture), call.ExclusiveCountDiff.ToString("F02", CultureInfo.InvariantCulture), call.InclusivePercentDiff.ToString("F02", CultureInfo.InvariantCulture), call.InclusiveCountDiff.ToString("F02", CultureInfo.InvariantCulture), call.TimeSpent.ToString("F02", CultureInfo.InvariantCulture) });
             }
 
             AnsiConsole.Write(grid);
@@ -445,44 +445,53 @@ namespace EzJit
                     }
                 }
 
-                var managedCallsDiff = DiffMethodCalls(managedCalls, managedCallsBase, 0, 0);
-                var nativeCallsDiff = DiffMethodCalls(nativeCalls, nativeCallsBase, 0, 0);
+                var managedCallsDiff = DiffMethodCalls(managedCalls, managedCallsBase, result.Duration, resultBase.Duration);
+                var nativeCallsDiff = DiffMethodCalls(nativeCalls, nativeCallsBase, result.Duration, resultBase.Duration);
                 var allCallsDiff = DiffMethodCalls(allCalls, allCallsBase, result.Duration, resultBase.Duration);
+
+                var managedCallsSumTimeSpent = managedCallsDiff.Sum(x => {
+                    if (x.Name.Contains("NOT FOUND IN BASE"))
+                        return 0;
+                    return x.TimeSpent;
+                });
+
+                var nativeCallsSumTimeSpent = nativeCallsDiff.Sum(x => {
+                    if (x.Name.Contains("NOT FOUND IN BASE"))
+                        return 0;
+                    return x.TimeSpent;
+                });
+
+                var allCallsSumTimeSpent = allCallsDiff.Sum(x => {
+                    if (x.Name.Contains("NOT FOUND IN BASE"))
+                        return 0;
+                    return x.TimeSpent;
+                });
 
                 jitMethodsDiff = jitMethodsDiff.OrderByDescending(x => x.TimeDiff).Take(EzJit.NumberOfMethodsToPrint).ToList();
                 managedCallsDiff = managedCallsDiff.OrderByDescending(x => x.ExclusivePercentDiff).Take(EzJit.NumberOfMethodsToPrint).ToList();
                 nativeCallsDiff = nativeCallsDiff.OrderByDescending(x => x.ExclusivePercentDiff).Take(EzJit.NumberOfMethodsToPrint).ToList();
-
-                var sumTimeSpent = allCallsDiff.Sum(x => {
-                    return x.TimeSpent;
-                });
-
                 allCallsDiff = allCallsDiff.OrderByDescending(x => x.ExclusivePercentDiff).Take(EzJit.NumberOfMethodsToPrint).ToList();
 
                 var jitMethodCodeGenSizesDiff = jitMethodsDiff.OrderByDescending(x => x.CodeGenSizeDiff).Take(EzJit.NumberOfMethodsToPrint).ToList();
 
+                var durationDiff = result.Duration - resultBase.Duration;
                 if (result.Duration != 0 && resultBase.Duration != 0)
                 {
                     AnsiConsole.WriteLine("");
                     AnsiConsole.MarkupLine("[purple]Duration[/]");
-                    AnsiConsole.WriteLine(result.Duration.ToString("F04", CultureInfo.InvariantCulture) + "ms");
+                    AnsiConsole.WriteLine(result.Duration.ToString("F02", CultureInfo.InvariantCulture) + "ms");
                     AnsiConsole.MarkupLine("[purple]Duration Base[/]");
-                    AnsiConsole.WriteLine(resultBase.Duration.ToString("F04", CultureInfo.InvariantCulture) + "ms");
+                    AnsiConsole.WriteLine(resultBase.Duration.ToString("F02", CultureInfo.InvariantCulture) + "ms");
 
                     AnsiConsole.WriteLine("");
                     AnsiConsole.MarkupLine("[purple]Duration - Diffs[/]");
-                    var durationDiff = result.Duration - resultBase.Duration;
-                    AnsiConsole.WriteLine(durationDiff.ToString("F04", CultureInfo.InvariantCulture) + "ms");
-
-                    AnsiConsole.WriteLine("");
-                    AnsiConsole.MarkupLine("[purple]Total Time Spent from Diffs[/]");
-                    AnsiConsole.WriteLine(sumTimeSpent.ToString("F04", CultureInfo.InvariantCulture) + "ms");
+                    AnsiConsole.WriteLine(durationDiff.ToString("F02", CultureInfo.InvariantCulture) + "ms");
                 }
 
                 AnsiConsole.WriteLine("");
                 AnsiConsole.MarkupLine("[purple]Total GC Time - Diffs[/]");
                 var totalGCTimeDiff = result.TotalGCTime - resultBase.TotalGCTime;
-                AnsiConsole.WriteLine(totalGCTimeDiff.ToString("F04", CultureInfo.InvariantCulture) + "ms");
+                AnsiConsole.WriteLine(totalGCTimeDiff.ToString("F02", CultureInfo.InvariantCulture) + "ms");
 
                 if (string.IsNullOrWhiteSpace(settings.OutputCsvPrefix))
                 {
@@ -490,11 +499,23 @@ namespace EzJit
                     PrintTopCodeGenSizesDiff(jitMethodCodeGenSizesDiff);
                     AnsiConsole.WriteLine("");
                     PrintTopSlowestJittedMethodsDiff(jitMethodsDiff);
+
                     AnsiConsole.WriteLine("");
+                    AnsiConsole.MarkupLine("[purple]Total Time Spent from Matched Diffs[/]");
+                    AnsiConsole.WriteLine(managedCallsSumTimeSpent.ToString("F02", CultureInfo.InvariantCulture) + "ms");
+                    AnsiConsole.WriteLine((managedCallsSumTimeSpent / durationDiff * 100).ToString("F02", CultureInfo.InvariantCulture) + "% of " + durationDiff.ToString("F02", CultureInfo.InvariantCulture) + "ms");
                     PrintTopSlowestManagedMethodCallsDiff(managedCallsDiff);
+
                     AnsiConsole.WriteLine("");
+                    AnsiConsole.MarkupLine("[purple]Total Time Spent from Matched Diffs[/]");
+                    AnsiConsole.WriteLine(nativeCallsSumTimeSpent.ToString("F02", CultureInfo.InvariantCulture) + "ms");
+                    AnsiConsole.WriteLine((nativeCallsSumTimeSpent / durationDiff * 100).ToString("F02", CultureInfo.InvariantCulture) + "% of " + durationDiff.ToString("F02", CultureInfo.InvariantCulture) + "ms");
                     PrintTopSlowestNativeMethodCallsDiff(nativeCallsDiff);
+
                     AnsiConsole.WriteLine("");
+                    AnsiConsole.MarkupLine("[purple]Total Time Spent from Matched Diffs[/]");
+                    AnsiConsole.WriteLine(allCallsSumTimeSpent.ToString("F02", CultureInfo.InvariantCulture) + "ms");
+                    AnsiConsole.WriteLine((allCallsSumTimeSpent / durationDiff * 100).ToString("F02", CultureInfo.InvariantCulture) + "% of " + durationDiff.ToString("F02", CultureInfo.InvariantCulture) + "ms");
                     PrintTopSlowestMethodCallsDiff(allCallsDiff);
                 }
                 else
@@ -572,12 +593,12 @@ namespace EzJit
                 {
                     AnsiConsole.WriteLine("");
                     AnsiConsole.MarkupLine("[purple]Duration[/]");
-                    AnsiConsole.WriteLine(result.Duration.ToString("F04", CultureInfo.InvariantCulture) + "ms");
+                    AnsiConsole.WriteLine(result.Duration.ToString("F02", CultureInfo.InvariantCulture) + "ms");
                 }
 
                 AnsiConsole.WriteLine("");
                 AnsiConsole.MarkupLine("[purple]Total GC Time[/]");
-                AnsiConsole.WriteLine(result.TotalGCTime.ToString("F04", CultureInfo.InvariantCulture) + "ms");
+                AnsiConsole.WriteLine(result.TotalGCTime.ToString("F02", CultureInfo.InvariantCulture) + "ms");
 
                 if (string.IsNullOrEmpty(settings.OutputCsvPrefix))
                 {
